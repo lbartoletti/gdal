@@ -3711,8 +3711,6 @@ double OGR_G_Distance3D(OGRGeometryH hFirst, OGRGeometryH hOther)
         OGRGeometry::FromHandle(hOther));
 }
 
-#ifdef HAVE_SFCGAL
-
 /************************************************************************/
 /*                           OGR_G_Buffer3D()                           */
 /************************************************************************/
@@ -3724,6 +3722,7 @@ double OGR_G_Distance3D(OGRGeometryH hFirst, OGRGeometryH hOther)
  *
  * NOTE: This function currently returns NULL with CPLE_NotSupported error.
  * SFCGAL does not provide a direct 3D buffer function in its C API.
+ * Requires SFCGAL support at runtime.
  *
  * @param hGeom the geometry.
  * @param dfDistance the buffer distance to be applied.
@@ -3752,6 +3751,7 @@ OGRGeometryH OGR_G_Buffer3D(OGRGeometryH hGeom, double dfDistance)
  *
  * The straight skeleton is a 2D algorithm used in computational geometry.
  * Only 2D polygons are supported (no Z coordinates).
+ * Requires SFCGAL support at runtime.
  *
  * @param hGeom the geometry (must be a 2D polygon).
  *
@@ -3779,6 +3779,7 @@ OGRGeometryH OGR_G_StraightSkeleton(OGRGeometryH hGeom)
  *
  * The medial axis (also known as topological skeleton) is a 2D algorithm.
  * Only 2D polygons are supported (no Z coordinates).
+ * Requires SFCGAL support at runtime.
  *
  * @param hGeom the geometry (must be a 2D polygon).
  *
@@ -3794,8 +3795,6 @@ OGRGeometryH OGR_G_ApproximateMedialAxis(OGRGeometryH hGeom)
     return OGRGeometry::ToHandle(
         OGRGeometry::FromHandle(hGeom)->ApproximateMedialAxis());
 }
-
-#endif  // HAVE_SFCGAL
 
 /************************************************************************/
 /*                       OGRGeometryRebuildCurves()                     */
@@ -8984,8 +8983,6 @@ IOGRGeometryVisitor::~IOGRGeometryVisitor() = default;
 
 IOGRConstGeometryVisitor::~IOGRConstGeometryVisitor() = default;
 
-#ifdef HAVE_SFCGAL
-
 /************************************************************************/
 /*                             Buffer3D()                               */
 /************************************************************************/
@@ -8997,8 +8994,8 @@ IOGRConstGeometryVisitor::~IOGRConstGeometryVisitor() = default;
  * Works on both 2D and 3D geometries. The result is typically a
  * PolyhedralSurface for 3D inputs, or an extruded polygon for 2D inputs.
  *
- * This method is built on the SFCGAL library. If OGR is built without SFCGAL,
- * this method will return nullptr.
+ * This method requires the SFCGAL library. If OGR is built without SFCGAL,
+ * this method will return nullptr with an error.
  *
  * @param dfDistance Buffer distance (same units as geometry coordinates)
  * @return Buffered geometry, or nullptr on error
@@ -9009,9 +9006,16 @@ IOGRConstGeometryVisitor::~IOGRConstGeometryVisitor() = default;
  * @since GDAL 3.11
  * @see Buffer() for 2D buffer operation
  */
-OGRGeometry *OGRGeometry::Buffer3D(double dfDistance) const
+OGRGeometry *OGRGeometry::Buffer3D(
+    UNUSED_IF_NO_SFCGAL double dfDistance) const
 {
+#ifndef HAVE_SFCGAL
+    CPL_IGNORE_RET_VAL(dfDistance);
+    CPLError(CE_Failure, CPLE_NotSupported, "SFCGAL support not enabled.");
+    return nullptr;
+#else
     return OGRSFCGALOperations::Buffer3D(this, dfDistance);
+#endif
 }
 
 /************************************************************************/
@@ -9028,8 +9032,8 @@ OGRGeometry *OGRGeometry::Buffer3D(double dfDistance) const
  * - Urban planning: block and parcel analysis
  * - Computational geometry: polygon partitioning
  *
- * This method is built on the SFCGAL library. If OGR is built without SFCGAL,
- * this method will return nullptr.
+ * This method requires the SFCGAL library. If OGR is built without SFCGAL,
+ * this method will return nullptr with an error.
  *
  * @return MultiLineString representing the skeleton, or nullptr on error
  *
@@ -9050,7 +9054,12 @@ OGRGeometry *OGRGeometry::Buffer3D(double dfDistance) const
  */
 OGRGeometry *OGRGeometry::StraightSkeleton() const
 {
+#ifndef HAVE_SFCGAL
+    CPLError(CE_Failure, CPLE_NotSupported, "SFCGAL support not enabled.");
+    return nullptr;
+#else
     return OGRSFCGALOperations::StraightSkeleton(this);
+#endif
 }
 
 /************************************************************************/
@@ -9068,8 +9077,8 @@ OGRGeometry *OGRGeometry::StraightSkeleton() const
  * than straight line segments, providing a different decomposition useful
  * for shape analysis and morphological operations.
  *
- * This method is built on the SFCGAL library. If OGR is built without SFCGAL,
- * this method will return nullptr.
+ * This method requires the SFCGAL library. If OGR is built without SFCGAL,
+ * this method will return nullptr with an error.
  *
  * @return MultiLineString representing the approximate medial axis,
  *         or nullptr on error
@@ -9092,7 +9101,10 @@ OGRGeometry *OGRGeometry::StraightSkeleton() const
  */
 OGRGeometry *OGRGeometry::ApproximateMedialAxis() const
 {
+#ifndef HAVE_SFCGAL
+    CPLError(CE_Failure, CPLE_NotSupported, "SFCGAL support not enabled.");
+    return nullptr;
+#else
     return OGRSFCGALOperations::ApproximateMedialAxis(this);
+#endif
 }
-
-#endif  // HAVE_SFCGAL

@@ -230,16 +230,12 @@ OGRGeometryH CPL_DLL OGR_G_SymDifference(OGRGeometryH,
                                          OGRGeometryH) CPL_WARN_UNUSED_RESULT;
 double CPL_DLL OGR_G_Distance(OGRGeometryH, OGRGeometryH);
 double CPL_DLL OGR_G_Distance3D(OGRGeometryH, OGRGeometryH);
-
-#ifdef HAVE_SFCGAL
 OGRGeometryH CPL_DLL OGR_G_Buffer3D(OGRGeometryH,
                                     double dfDistance) CPL_WARN_UNUSED_RESULT;
 OGRGeometryH CPL_DLL
 OGR_G_StraightSkeleton(OGRGeometryH) CPL_WARN_UNUSED_RESULT;
 OGRGeometryH CPL_DLL
 OGR_G_ApproximateMedialAxis(OGRGeometryH) CPL_WARN_UNUSED_RESULT;
-#endif
-
 double CPL_DLL OGR_G_Length(OGRGeometryH);
 double CPL_DLL OGR_G_GeodesicLength(OGRGeometryH);
 double CPL_DLL OGR_G_Area(OGRGeometryH);

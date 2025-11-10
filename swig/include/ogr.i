@@ -3947,7 +3947,7 @@ public:
   }
 %clear OGRGeometryShadow* other;
 
-#ifdef HAVE_SFCGAL
+  // SFCGAL-specific methods (return error at runtime if SFCGAL not available)
   %newobject Buffer3D;
   OGRGeometryShadow* Buffer3D( double dfDistance ) {
     return (OGRGeometryShadow*) OGR_G_Buffer3D( self, dfDistance );
@@ -3962,7 +3962,6 @@ public:
   OGRGeometryShadow* ApproximateMedialAxis() {
     return (OGRGeometryShadow*) OGR_G_ApproximateMedialAxis( self );
   }
-#endif
 
   void Empty () {
     OGR_G_Empty(self);
