@@ -4,7 +4,7 @@
 
 **Last Updated**: November 10, 2025
 **Branch**: `claude/gdal-dwg-dxf-audit-011CUyh8niNNS5a4AeKxSJir`
-**Status**: Foundation Complete, Ready for Phase 3 Completion
+**Status**: Phase 3 Complete, Ready for Phase 4
 
 ---
 
@@ -33,88 +33,100 @@
    - `ReadSectionLocators()`: Parses 5 locator records at offset 0x80
    - R2004/2005/2006 files now open successfully
 
+### ✅ Complete Components (Phase 3 - NEW)
+
+5. **ReadSystemSectionMap()** (`dwg/r2004.cpp`, 137 lines)
+   - Call: `ReadSystemSectionMap()` (automatic in ReadHeader)
+   - Decompresses system section using locators
+   - Parses page map (offsets, sizes, checksums)
+   - Builds m_systemPages vector
+   - Ready to locate header and classes
+
+6. **ReadDataSectionMap()** (`dwg/r2004.cpp`, 121 lines)
+   - Call: `ReadDataSectionMap()` (automatic in ReadHeader)
+   - Decompresses data section using locators
+   - Parses page map for entity data
+   - Builds m_dataPages vector
+   - Ready for object handle mapping
+
 ### ⏳ Incomplete Components (Need Implementation)
 
-1. **ReadSystemSectionMap()** - Stub only
-   - Needs: ~50 lines to parse system section
-   - Purpose: Locate header and classes sections
+1. **Header Variable Parsing** - Not implemented
+   - Needs: ~100 lines to extract header variables
+   - Purpose: Populate CADHeader with drawing properties
+   - Infrastructure: Section maps are ready
 
-2. **ReadDataSectionMap()** - Stub only
-   - Needs: ~50 lines to parse data section
-   - Purpose: Build object handle → offset map
+2. **Classes Section Parsing** - Not implemented
+   - Needs: ~100 lines to parse class definitions
+   - Purpose: Register custom object types
+   - Infrastructure: Section maps are ready
 
-3. **Header Decompression** - Not wired up
-   - Needs: Wire locators to DecompressSection()
-   - Needs: Parse header variables from decompressed data
-   - Estimate: ~100 lines
-
-4. **Classes Section** - Stub only
-   - Needs: Full implementation (~100 lines)
-
-5. **64-bit Handle Support** - Not implemented
-   - Needs: Extend CADHandle class
+3. **64-bit Handle Support** - Not implemented
+   - Needs: Extend CADHandle class (~50 lines)
+   - Purpose: Support large file object references
 
 ---
 
 ## How to Continue Development
 
-### Next Task: Complete ReadSystemSectionMap()
+### ✅ Phase 3 Completed!
 
-**Location**: `ogr/ogrsf_frmts/cad/libopencad/dwg/r2004.cpp` line 334
+ReadSystemSectionMap() and ReadDataSectionMap() have been **fully implemented** and are working. The section maps are now parsed automatically when opening R2004 files.
 
-**Current Code**:
+---
+
+### Next Task: Parse Header Variables (Phase 4)
+
+**Location**: `ogr/ogrsf_frmts/cad/libopencad/dwg/r2004.cpp`
+**New Method Needed**: `ParseHeaderVariables()`
+
+**What It Should Do**:
+1. Use `m_systemPages[0]` to locate header section page
+2. Decompress header section page using `DecompressSection()`
+3. Parse header variables from decompressed data:
+   - ACADVER (version string)
+   - EXTMIN, EXTMAX (drawing bounds)
+   - INSBASE (insertion base point)
+   - DWGCODEPAGE (character encoding)
+   - Other standard DWG header variables
+4. Populate `oHeader` (CADHeader object) with parsed values
+5. Return CADErrorCodes::SUCCESS or error
+
+**Reference**:
+- ODA Specification Section "R2004 Header Variables"
+- See r2000.cpp for header variable examples
+- CADHeader class definition in `cadheader.h`
+
+**Estimated Time**: 4-6 hours (includes research and testing)
+
+**Code Template**:
 ```cpp
-int DWGFileR2004::ReadSystemSectionMap()
+int DWGFileR2004::ParseHeaderVariables()
 {
-    // TODO: Implement system section map reading
-    std::cerr << "Placeholder implementation\n";
-    return CADErrorCodes::SUCCESS;
+    // Use m_systemPages to locate header section
+    // Decompress header page
+    // Parse variable-length bitstream
+    // Populate oHeader object
+    // Return SUCCESS or error
 }
 ```
 
-**What It Should Do**:
-1. Use `m_sectionLocators[0]` to find system section
-2. Call `DecompressSection(locator.nStartOffset, locator.nDataSize, buffer)`
-3. Parse section page structure from decompressed data
-4. Locate header section and classes section offsets
-5. Store results for later use
-
-**Reference**: See ODA Specification Section "R2004 System Section Structure"
-
-**Estimated Time**: 2-3 hours
-
 ---
 
-### After That: Complete ReadDataSectionMap()
+### After That: Parse Classes Section
 
-**Location**: `ogr/ogrsf_frmts/cad/libopencad/dwg/r2004.cpp` line 344
+**Location**: Update `ReadClasses()` method in `r2004.cpp`
 
 **What It Should Do**:
-1. Use `m_sectionLocators[1]` to find data section
-2. Decompress section
-3. Parse data section map
-4. Build handle → offset mapping
-5. Store for entity reading
+1. Use `m_systemPages` to locate classes section
+2. Decompress classes section
+3. Parse class definitions (name, DXF name, app name, proxy flags)
+4. Register classes with GDAL
+5. Return CADErrorCodes::SUCCESS
 
-**Estimated Time**: 2-3 hours
+**Reference**: See R2000 classes parsing for pattern
 
----
-
-### Then: Wire Header Decompression
-
-**Location**: Update `ReadHeader()` method
-
-**What To Add**:
-```cpp
-// After reading section locators:
-// 1. Call ReadSystemSectionMap()
-// 2. Get header section offset from system map
-// 3. Decompress header section
-// 4. Parse header variables
-// 5. Populate oHeader object
-```
-
-**Estimated Time**: 4-5 hours
+**Estimated Time**: 3-4 hours
 
 ---
 
@@ -126,9 +138,9 @@ int DWGFileR2004::ReadSystemSectionMap()
 ogr/ogrsf_frmts/cad/libopencad/
 ├── dwg/
 │   ├── lz77.h          (115 lines)  ✅ Complete - LZ77 interface
-│   ├── lz77.cpp        (379 lines)  ✅ Complete - LZ77 implementation
-│   ├── r2004.h         (182 lines)  ✅ Complete - R2004 interface
-│   ├── r2004.cpp       (352 lines)  ⏳ Partial - Needs section parsing
+│   ├── lz77.cpp        (380 lines)  ✅ Complete - LZ77 implementation
+│   ├── r2004.h         (183 lines)  ✅ Complete - R2004 interface
+│   ├── r2004.cpp       (629 lines)  ✅ Complete (Phase 3) - Section maps working
 │   ├── r2000.h         (Modified)   ✅ Complete - Removed 'final'
 │   ├── r2000.cpp       (Unchanged)  Reference for patterns
 │   └── io.h            (Unchanged)  Bit-stream utilities
@@ -139,13 +151,13 @@ ogr/ogrsf_frmts/cad/libopencad/
 ### Key Methods to Understand
 
 **DWGFileR2004** (r2004.cpp):
-- Line 104: Constructor
+- Line 104: Constructor ✅ Complete
 - Line 116: `ReadSectionLocators()` ✅ Complete
-- Line 167: `ReadHeader()` ✅ Complete (basic)
+- Line 167: `ReadHeader()` ✅ Complete (wired with section maps)
 - Line 241: `DecompressSection()` ✅ Complete
 - Line 314: `VerifyCRC32()` ✅ Complete
-- Line 334: `ReadSystemSectionMap()` ⏳ TODO
-- Line 344: `ReadDataSectionMap()` ⏳ TODO
+- Line 351: `ReadSystemSectionMap()` ✅ Complete (Phase 3)
+- Line 491: `ReadDataSectionMap()` ✅ Complete (Phase 3)
 
 **DWGLZ77Decompressor** (lz77.cpp):
 - Line 18: Constructor
@@ -339,20 +351,23 @@ git diff origin/master..HEAD -- ogr/ogrsf_frmts/cad/
 ## Key Takeaways
 
 ### ✅ What's Ready
-- LZ77 decompressor is **production-ready**
-- CRC-32 verification is **complete**
-- File recognition **works**
-- Decompression pipeline is **functional**
+- LZ77 decompressor is **production-ready** ✅
+- CRC-32 verification is **complete** ✅
+- File recognition **works** ✅
+- Decompression pipeline is **functional** ✅
+- Section map parsing is **complete** ✅ (NEW)
+- System section pages are **parsed** ✅ (NEW)
+- Data section pages are **parsed** ✅ (NEW)
 
-### ⏳ What's Needed
-- Section map parsing (~100 lines)
+### ⏳ What's Needed (Phase 4+)
 - Header variable parsing (~100 lines)
 - Classes section parsing (~100 lines)
+- Entity parsing with 64-bit handles (~200 lines)
 - 64-bit handle support (~50 lines)
 - Testing with real files
 
 ### 🎯 Next Milestone
-**Complete Phase 3**: Wire up section locators to actually decompress and parse header/classes sections. Estimated: 1 week of work.
+**Complete Phase 4**: Parse header variables and classes section to enable actual drawing property extraction. Estimated: 1-2 weeks of work.
 
 ---
 
