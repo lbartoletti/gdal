@@ -1,10 +1,10 @@
 # Code Audit Report: GDAL DWG/DXF Enhancement Plan
-## Supporting New DWG Versions Using ACadSharp Architecture
+## Supporting New DWG Versions Using ODA Specification and ACadSharp Architecture
 
 **Date:** November 10, 2025
 **Project:** GDAL (Geospatial Data Abstraction Library)
 **Focus:** DWG/DXF Reader Enhancement
-**Version:** Draft 1.0
+**Version:** 2.0 (Updated with ODA Specification Analysis)
 
 ---
 
@@ -38,7 +38,7 @@ The **CAD driver** (using libopencad) is the only built-in, license-compatible D
 
 ### Recommended Approach
 
-**Enhance libopencad with insights from ACadSharp** through a hybrid strategy:
+**Enhance libopencad with insights from ACadSharp and ODA Specification** through a hybrid strategy:
 
 1. **Phase 1:** Add AC1018 (R2004) support to libopencad (~6 months)
 2. **Phase 2:** Add AC1021 (R2007) support (~4 months)
@@ -47,6 +47,24 @@ The **CAD driver** (using libopencad) is the only built-in, license-compatible D
 5. **Phase 5:** Add AC1032 (R2018+) support (~8 months)
 
 **Total Estimated Timeline:** 28 months (2.3 years) for full coverage
+
+### Key Technical References
+
+**Primary Specification:**
+- **Open Design Specification for .dwg files (Version 5.4.1)**
+  - URL: https://www.opendesign.com/files/guestdownloads/OpenDesign_Specification_for_.dwg_files.pdf
+  - Publisher: Open Design Alliance (ODA)
+  - Coverage: DWG R13 through R2013+ (with R2018 in later versions)
+  - License: Freely available to public (not just ODA members)
+  - Status: **Authoritative technical reference** - most comprehensive public documentation
+
+**Reference Implementation:**
+- **ACadSharp** (C#, MIT License) - https://github.com/DomCR/ACadSharp
+  - Modern, well-structured code examples
+  - Covers AC1012 through AC1032
+  - Actively maintained
+
+**Strategy:** Use ODA Specification as primary technical reference, ACadSharp as validation and implementation guide, implement in C++ for libopencad.
 
 ---
 
@@ -324,6 +342,243 @@ DwgLZ77AC21Decompressor  // R2007+
 - Many projects (FreeCAD, LibreCAD, Blender) requested MIT/LGPL but denied
 
 **Verdict:** **Cannot be used** in GDAL due to license incompatibility. Can be studied for algorithm insights (reverse-engineering is legal), but code cannot be copied.
+
+---
+
+### 2.4 Open Design Specification for .dwg files (ODA Specification)
+
+**Document:** Open Design Specification for .dwg files
+**Version:** 5.4.1 (publicly available)
+**Publisher:** Open Design Alliance (ODA)
+**URL:** https://www.opendesign.com/files/guestdownloads/OpenDesign_Specification_for_.dwg_files.pdf
+**Availability:** **Free public download** (not restricted to ODA members)
+**License:** Freely available technical documentation
+
+**Coverage:** DWG file format versions **R13 (AC1012)** through **R2013 (AC1027)**, with R2018 coverage in newer specification versions.
+
+#### Document Structure
+
+The ODA specification provides the **most comprehensive public documentation** of the proprietary DWG binary format. It includes:
+
+1. **Bit Codes and Data Definitions**
+   - Bit-level data encoding schemes
+   - Variable-length integer encoding (bit short, bit long, etc.)
+   - Compressed data representations for common values (0.0, 1.0 for doubles; 0, 256 for shorts)
+   - Two-bit prefix codes indicating data size or literal values
+
+2. **Version-Specific File Format Organization**
+   - **R13/R14 DWG File Format Organization**
+   - **R2004 DWG File Format Organization** (AC1018)
+   - **R2007 DWG File Format Organization** (AC1021)
+   - **R2010 DWG File Format Organization** (AC1024)
+   - **R2013 DWG File Format Organization** (AC1027)
+
+3. **Key Sections Documented:**
+   - File headers with version identification
+   - Section locators and page maps
+   - Data sections: AcDb:Header, AcDb:Classes, AcDb:Handles, AcDb:Objects, etc.
+   - Object and entity definitions
+   - Table structures (Layers, Linetypes, Styles, etc.)
+
+#### Critical Technical Details
+
+**R2004 Compression (AC1018) - Major Format Change:**
+
+The specification documents that **R2004 introduced LZ77 compression**, which is the primary technical barrier between R2000 and newer formats:
+
+- **Algorithm:** DWG-specific variation of LZ77 sliding window compression
+- **Purpose:** Compress section data to reduce file size
+- **Implementation:**
+  - Literal Length field indicates first sequence of uncompressed data
+  - Compressed bytes referenced by (offset + length) pairs
+  - **Key Feature:** Length may be greater than offset (important for algorithm correctness)
+  - Uses hashing for speed (trades some compression ratio for performance)
+
+**Decompression Structure:**
+```
+Compressed Section Format:
+1. Literal Length (initial uncompressed data length)
+2. Sequence of:
+   - litCount: Number of literal (uncompressed) bytes to copy from input
+   - compressedBytes: Number of bytes to copy from previous location
+   - compOffset: Offset backwards from current position in decompressed stream
+3. Repeat until section complete
+```
+
+**Standard LZ77 Pseudo-code (from specification):**
+```
+while input is not empty do
+    match := longest repeated occurrence of input that begins in window
+    if match exists then
+        d := distance to start of match
+        l := length of match
+        c := char following match in input
+    else
+        d := 0
+        l := 0
+        c := first char of input
+    end if
+    output (d, l, c)
+    discard l + 1 chars from front of window
+    s := pop l + 1 chars from front of input
+    append s to back of window
+repeat
+```
+
+**R2007 File Structure (AC1021):**
+
+The specification documents a significantly reorganized file layout:
+
+```
+File Layout R2007:
+Offset     Section
+0x00       Metadata (0x80 bytes) - includes "AC1021" version string
+0x80       File Header (0x400 bytes)
+           - Contains page map address, size, CRC
+           - Contains section map addresses, sizes, CRCs
+0x480      Data Page Map
+           - Primary copy
+           - Followed by duplicate copy
+Later      Section Map 1
+           Section Map 2
+```
+
+**Metadata Section (R2007+):**
+- Version string: "AC1021" at offset 0x00
+- Maintenance release version
+- Preview image address
+- DWG version identifier
+- Application version
+- Codepage
+- Security type
+- Unknown data
+- Encrypted properties
+- Compression type
+
+**CRC Implementation:**
+
+The DWG format uses a **custom CRC algorithm**:
+
+- Output: 2 bytes (16-bit CRC)
+- Method: Lookup table with 256 16-bit values
+- **Magic Number:** Autodesk XORs the result with a proprietary magic number
+- **Seed:** CRC32 calculations in R2004+ use zero as seed value
+- Purpose: Error detection and data integrity validation
+
+**Reed-Solomon Encoding (R2007+):**
+
+Introduced in R2007 for enhanced error correction:
+- Applied to critical sections
+- Provides error correction beyond CRC
+- Used in conjunction with LZ77 compression
+
+**Object Handles:**
+
+The specification documents handle encoding schemes:
+- **R13-R2000:** 32-bit handles
+- **R2004+:** Extended to support 64-bit handles
+- Handle references use offset encoding for efficiency
+- Multiple encoding modes (absolute, relative, etc.)
+
+**Section Organization:**
+
+All versions share conceptual section organization:
+
+1. **Header Section:** Drawing variables, settings, metadata
+2. **Classes Section:** Custom object class definitions
+3. **Handles Section:** Object handle mapping
+4. **Objects Section:** Non-graphical objects (dictionaries, tables)
+5. **Entities Section:** Graphical entities (lines, circles, polylines, etc.)
+6. **Preview Section:** Thumbnail image
+7. **VBA Project Section:** Embedded VBA code (if present)
+
+**Key Differences R2000 → R2004:**
+
+| Feature | R2000 (AC1015) | R2004 (AC1018) |
+|---------|---------------|----------------|
+| **Compression** | None | LZ77 compression |
+| **Error Correction** | CRC only | CRC + enhanced validation |
+| **Handles** | 32-bit | 64-bit support added |
+| **Encryption** | Minimal | Enhanced encryption options |
+| **True Color** | Limited | Full RGB support |
+| **New Entities** | - | MLEADER, TABLE, etc. |
+| **File Size** | Larger | Significantly smaller (compressed) |
+
+**Key Differences R2004 → R2007:**
+
+| Feature | R2004 (AC1018) | R2007 (AC1021) |
+|---------|----------------|----------------|
+| **File Structure** | Legacy layout | Reorganized with metadata section |
+| **Compression** | LZ77 variant 1 | Enhanced LZ77 variant |
+| **Error Correction** | CRC | CRC + Reed-Solomon |
+| **Page/Section Maps** | Simple | Enhanced dual-copy system |
+| **Metadata** | In header | Separate 0x80 metadata section |
+
+**Key Differences R2007 → R2013:**
+
+According to the specification:
+- **R2010 (AC1024):** Minimal format changes; primarily ACIS version updates for 3D solids
+- **R2013 (AC1027):** File header, page map, section map, and compression **same as R2004**
+  - This is significant: R2013 reverted to R2004-style organization
+  - Simplifies implementation: R2013 builds on R2004, not R2007
+
+#### Strengths as Technical Reference
+
+1. **Authoritative:** Created by ODA through extensive reverse-engineering
+2. **Comprehensive:** Covers bit-level encoding, all major sections, entity formats
+3. **Public:** Freely available without membership or licensing
+4. **Detailed:** Includes pseudo-code, data structure layouts, algorithms
+5. **Updated:** ODA maintains and updates specification as new versions analyzed
+6. **Validated:** Used by hundreds of CAD applications worldwide
+
+#### Limitations
+
+1. **Complexity:** Highly technical, requires deep understanding of binary formats
+2. **Incomplete:** Some proprietary details may be missing or undocumented
+3. **No Source Code:** Specification only; no reference implementation provided
+4. **Version Lag:** Latest public version may not cover newest AutoCAD releases immediately
+5. **Learning Curve:** Dense technical document (hundreds of pages)
+
+#### How to Use in Implementation
+
+**Recommended Workflow:**
+
+1. **Phase 1 (R2004):**
+   - Study ODA Specification Section: "R2004 DWG File Format Organization"
+   - Implement LZ77 decompressor based on specification algorithm
+   - Reference ACadSharp's `DwgLZ77AC18Decompressor.cs` for validation
+   - Test with real R2004 files
+
+2. **Phase 2 (R2007):**
+   - Study ODA Specification Section: "R2007 DWG File Format Organization"
+   - Understand metadata section layout (0x80 bytes)
+   - Implement enhanced page/section map parsing
+   - Implement Reed-Solomon error correction
+   - Reference ACadSharp's `DwgLZ77AC21Decompressor.cs`
+
+3. **Phase 3-5 (R2010, R2013, R2018):**
+   - Use specification as primary reference for each version
+   - Cross-validate with ACadSharp implementation
+   - Test extensively with real-world files
+
+**Key Insight:** The ODA Specification provides the **"what"** (file format structure), while ACadSharp provides the **"how"** (working C# implementation). Together, they form a complete reference for C++ implementation in libopencad.
+
+#### Legal Considerations
+
+**Reverse-Engineering Legality:**
+- The ODA Specification is the result of legal reverse-engineering
+- Precedent: *Sega Enterprises Ltd. v. Accolade, Inc.* (1992) - reverse-engineering for interoperability is legal
+- ODA makes specification publicly available, indicating no legal restrictions on its use
+- Implementation based on publicly available specifications is lawful
+
+**Best Practices:**
+1. Use ODA Specification and ACadSharp as references, not source code to copy
+2. Implement algorithms independently in C++ for libopencad
+3. Test against real DWG files, not just specification examples
+4. Document that implementation is based on publicly available specifications
+5. Do not copy code from LibreDWG (GPLv3 licensed)
+
+**Verdict:** **Essential primary reference** for DWG format implementation. The ODA Specification is the most authoritative public documentation available and should be the foundation for all version implementations, supplemented by ACadSharp for validation.
 
 ---
 
@@ -852,17 +1107,19 @@ Based on ACadSharp architecture and DWG specifications:
 ## 8. Risk Assessment & Mitigation
 
 ### Risk 1: Format Specification Ambiguity
-**Probability:** HIGH
+**Probability:** MEDIUM (reduced from HIGH with ODA Specification)
 **Impact:** HIGH
 
-**Description:** DWG format is proprietary and undocumented. ACadSharp's implementation may have gaps or errors.
+**Description:** DWG format is proprietary. While the ODA Specification provides comprehensive documentation, some details may be incomplete or ambiguous.
 
 **Mitigation:**
-- Maintain collection of real-world test files
+- **Use ODA Specification as primary technical reference** (Version 5.4.1)
+- Cross-validate with ACadSharp implementation (C# reference code)
+- Maintain collection of real-world test files for validation
 - Cross-reference with LibreDWG behavior (without copying code)
 - Engage with ACadSharp maintainer for clarifications
 - Implement extensive logging for debugging
-- Start with R2004 (most similar to R2000)
+- Start with R2004 (most similar to R2000, well-documented in ODA spec)
 
 ### Risk 2: Performance Degradation
 **Probability:** MEDIUM
@@ -1053,17 +1310,31 @@ GDAL's current DWG support through libopencad is **severely limited** (R2000 onl
 - Convert files externally
 - Use GPL-licensed LibreDWG (incompatible with GDAL's license)
 
-**ACadSharp provides an excellent MIT-licensed reference implementation** covering AC1012 through AC1032, but is written in C# and cannot be directly integrated into GDAL.
+**The Open Design Alliance (ODA) Specification for .dwg files (Version 5.4.1)** provides the **authoritative technical reference** needed to implement support for newer DWG versions. This freely available specification documents DWG R13 through R2013+ with comprehensive technical details including:
+- File structure and section organization
+- LZ77 compression algorithms (R2004+)
+- Bit encoding and data definitions
+- CRC and Reed-Solomon error correction
+- Object and entity formats
 
-The **recommended approach** is to **learn from ACadSharp's algorithms and reimplement them in C++** within libopencad. This strategy:
-- Maintains GDAL's licensing requirements
-- Builds on existing foundation
-- Provides incremental value
+**ACadSharp provides an excellent MIT-licensed reference implementation** covering AC1012 through AC1032, written in modern C#, which serves as validation for the ODA specification.
+
+The **recommended approach** is to:
+1. Use the **ODA Specification as the primary technical reference**
+2. **Cross-validate with ACadSharp's implementation** for correctness
+3. **Reimplement in C++** within libopencad
+
+This strategy:
+- Leverages the most authoritative public DWG format documentation
+- Maintains GDAL's licensing requirements (MIT-compatible)
+- Builds on existing libopencad foundation
+- Provides incremental value through phased delivery
 - Requires significant but manageable effort (28 months)
+- Reduces technical risk through dual-source validation
 
-**Highest Priority:** Implement support for **AC1018 (R2004)** and **AC1027 (R2013)** first, as these represent critical format transitions and are widely used in industry.
+**Highest Priority:** Implement support for **AC1018 (R2004)** and **AC1027 (R2013)** first, as these represent critical format transitions and are widely used in industry. Both versions are comprehensively documented in the ODA Specification.
 
-With proper resourcing and execution, GDAL can achieve comprehensive, open-source DWG support rivaling commercial solutions.
+With proper resourcing, execution, and use of the ODA Specification, GDAL can achieve comprehensive, open-source DWG support rivaling commercial solutions.
 
 ---
 
@@ -1137,21 +1408,47 @@ ACadSharp/
 └── docs/                         # Documentation
 ```
 
-### Appendix D: Contact Information
+### Appendix D: Key References and Contact Information
+
+**Primary Technical References:**
+
+**Open Design Alliance (ODA) Specification:**
+- Document: Open Design Specification for .dwg files (Version 5.4.1)
+- URL: https://www.opendesign.com/files/guestdownloads/OpenDesign_Specification_for_.dwg_files.pdf
+- Publisher: Open Design Alliance
+- Website: https://www.opendesign.com
+- Status: Freely available to public
+- Coverage: DWG R13 through R2013+ (R2018 in newer versions)
+- Purpose: **Primary authoritative technical reference** for DWG format implementation
 
 **ACadSharp:**
 - Maintainer: DomCR
 - GitHub: https://github.com/DomCR/ACadSharp
 - License: MIT
+- Purpose: Reference implementation and validation
+- Versions: AC1012 (R13) through AC1032 (R2018+)
 
 **libopencad (abandoned):**
 - Original Author: Alexandr Borzykh (mush3d@gmail.com)
 - Co-Author: Dmitry Baryshnikov (NextGIS)
 - GitHub: https://github.com/sandyre/libopencad (archived)
+- Status: No longer actively maintained
+- Note: Embedded in GDAL at ogr/ogrsf_frmts/cad/libopencad/
 
 **GDAL:**
 - Mailing List: gdal-dev@lists.osgeo.org
 - GitHub: https://github.com/OSGeo/gdal
+- Documentation: https://gdal.org
+
+**Additional Technical Resources:**
+
+- **LibreDWG** (GPLv3+ - for algorithm reference only, cannot copy code):
+  - GitHub: https://github.com/LibreDWG/libredwg
+  - Documentation: https://www.gnu.org/software/libredwg/manual/LibreDWG.html
+
+- **ezdxf** (Python, MIT - DXF only):
+  - GitHub: https://github.com/mozman/ezdxf
+  - Documentation: https://ezdxf.readthedocs.io/
 
 ---
 
