@@ -204,6 +204,29 @@ def pytest_collection_modifyitems(config, items):
                     )
                 )
 
+        for mark in item.iter_markers("require_sfcgal"):
+            if not ogrtest.have_sfcgal():
+                item.add_marker(pytest.mark.skip("SFCGAL not available"))
+
+            required_version = (
+                mark.args[0] if len(mark.args) > 0 else 0,
+                mark.args[1] if len(mark.args) > 1 else 0,
+                mark.args[2] if len(mark.args) > 2 else 0,
+            )
+
+            actual_version = (
+                ogr.GetSFCGALVersionMajor(),
+                ogr.GetSFCGALVersionMinor(),
+                ogr.GetSFCGALVersionMicro(),
+            )
+
+            if actual_version < required_version:
+                item.add_marker(
+                    pytest.mark.skip(
+                        f"Requires SFCGAL >= {'.'.join(str(x) for x in required_version)}"
+                    )
+                )
+
         for mark in item.iter_markers("require_proj"):
             required_version = (
                 mark.args[0],

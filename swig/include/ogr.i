@@ -676,6 +676,29 @@ int GetGEOSVersionMicro() {
 %}
 
 /************************************************************************/
+/*                            OGRGetSFCGALVersion                       */
+/************************************************************************/
+%inline %{
+int GetSFCGALVersionMajor() {
+    int num;
+    OGRGetSFCGALVersion(&num, NULL, NULL);
+    return num;
+}
+
+int GetSFCGALVersionMinor() {
+    int num;
+    OGRGetSFCGALVersion(NULL, &num, NULL);
+    return num;
+}
+
+int GetSFCGALVersionMicro() {
+    int num;
+    OGRGetSFCGALVersion(NULL, NULL, &num);
+    return num;
+}
+%}
+
+/************************************************************************/
 /*                               OGREnvelope                            */
 /************************************************************************/
 

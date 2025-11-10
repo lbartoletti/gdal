@@ -62,6 +62,42 @@ bool OGRGetGEOSVersion(int *pnMajor, int *pnMinor, int *pnPatch)
 #endif
 
 /************************************************************************/
+/*                        OGRGetSFCGALVersion()                         */
+/************************************************************************/
+
+/** \brief Get the SFCGAL version
+ *
+ * @param pnMajor Pointer to major version number, or NULL
+ * @param pnMinor Pointer to minor version number, or NULL
+ * @param pnPatch Pointer to patch version number, or NULL
+ * @return TRUE if GDAL is built against SFCGAL
+ * @since GDAL 3.13.0
+ */
+#ifdef HAVE_SFCGAL
+bool OGRGetSFCGALVersion(int *pnMajor, int *pnMinor, int *pnPatch)
+{
+    if (pnMajor)
+        *pnMajor = SFCGAL_VERSION_MAJOR;
+    if (pnMinor)
+        *pnMinor = SFCGAL_VERSION_MINOR;
+    if (pnPatch)
+        *pnPatch = SFCGAL_VERSION_PATCH;
+    return TRUE;
+}
+#else
+bool OGRGetSFCGALVersion(int *pnMajor, int *pnMinor, int *pnPatch)
+{
+    if (pnMajor)
+        *pnMajor = 0;
+    if (pnMinor)
+        *pnMinor = 0;
+    if (pnPatch)
+        *pnPatch = 0;
+    return FALSE;
+}
+#endif
+
+/************************************************************************/
 /*                           ToPointer()                                */
 /************************************************************************/
 

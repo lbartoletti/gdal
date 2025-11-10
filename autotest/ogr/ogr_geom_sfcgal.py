@@ -18,6 +18,7 @@ pytestmark = pytest.mark.require_driver("Memory")
 # Test that new methods exist and are callable
 
 
+@pytest.mark.require_sfcgal
 def test_ogr_geom_sfcgal_new_methods_exist():
     """Test that new SFCGAL methods exist in the API"""
 
@@ -39,6 +40,7 @@ def test_ogr_geom_sfcgal_new_methods_exist():
 # Test StraightSkeleton basic functionality
 
 
+@pytest.mark.require_sfcgal
 def test_ogr_geom_sfcgal_straight_skeleton_simple():
     """Test straight skeleton on simple square"""
 
@@ -53,6 +55,7 @@ def test_ogr_geom_sfcgal_straight_skeleton_simple():
     assert not skeleton.IsEmpty(), "Skeleton should not be empty"
 
 
+@pytest.mark.require_sfcgal
 def test_ogr_geom_sfcgal_straight_skeleton_3d_error():
     """Test that StraightSkeleton rejects 3D geometries"""
 
@@ -73,6 +76,7 @@ def test_ogr_geom_sfcgal_straight_skeleton_3d_error():
 # Test ApproximateMedialAxis basic functionality
 
 
+@pytest.mark.require_sfcgal
 def test_ogr_geom_sfcgal_medial_axis_simple():
     """Test approximate medial axis on simple square"""
 
@@ -87,6 +91,7 @@ def test_ogr_geom_sfcgal_medial_axis_simple():
     # Note: Medial axis can be empty for some simple geometries - this is expected
 
 
+@pytest.mark.require_sfcgal
 def test_ogr_geom_sfcgal_medial_axis_3d_error():
     """Test that ApproximateMedialAxis rejects 3D geometries"""
 
@@ -107,6 +112,7 @@ def test_ogr_geom_sfcgal_medial_axis_3d_error():
 # Test Buffer3D
 
 
+@pytest.mark.require_sfcgal(2, 0, 0)
 def test_ogr_geom_sfcgal_buffer3d():
     """Test Buffer3D on simple Point (requires SFCGAL 2.0.0+)"""
 
@@ -133,6 +139,7 @@ def test_ogr_geom_sfcgal_buffer3d():
 # Test backward compatibility - existing Distance3D still works
 
 
+@pytest.mark.require_sfcgal
 def test_ogr_geom_sfcgal_distance3d_backward_compat():
     """Test that existing Distance3D method still works (backward compatibility)"""
 
@@ -151,6 +158,7 @@ def test_ogr_geom_sfcgal_distance3d_backward_compat():
 # Test error handling
 
 
+@pytest.mark.require_sfcgal
 def test_ogr_geom_sfcgal_straight_skeleton_non_polygon():
     """Test that StraightSkeleton rejects non-polygon geometries"""
 
@@ -165,6 +173,7 @@ def test_ogr_geom_sfcgal_straight_skeleton_non_polygon():
             line.StraightSkeleton()
 
 
+@pytest.mark.require_sfcgal
 def test_ogr_geom_sfcgal_medial_axis_non_polygon():
     """Test that ApproximateMedialAxis rejects non-polygon geometries"""
 
@@ -183,6 +192,7 @@ def test_ogr_geom_sfcgal_medial_axis_non_polygon():
 # Tests migrated from ogr_geom.py
 
 
+@pytest.mark.require_sfcgal
 def test_ogr_geom_triangle_sfcgal():
     """Test SFCGAL operations on Triangle geometries"""
 
@@ -200,6 +210,7 @@ def test_ogr_geom_triangle_sfcgal():
     assert g4.Equals(g3)
 
 
+@pytest.mark.require_sfcgal
 def test_ogr_geom_sfcgal():
     """Test SFCGAL with various geometry types"""
 
@@ -219,6 +230,7 @@ def test_ogr_geom_sfcgal():
     g1.Distance(g2)
 
 
+@pytest.mark.require_sfcgal
 def test_ogr_geom_sfcgal_distance3D():
     """Test Distance3D with SFCGAL"""
 
@@ -231,6 +243,7 @@ def test_ogr_geom_sfcgal_distance3D():
     assert point1.Distance3D(point2) == 5.0
 
 
+@pytest.mark.require_sfcgal
 def test_ogr_geom_sfcgal_intersection3D():
     """Test 3D intersection with SFCGAL"""
 
