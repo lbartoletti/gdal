@@ -122,18 +122,18 @@ class CPL_DLL OGRSFCGALOperations
     static bool Intersects3D(const OGRGeometry *poGeom1,
                              const OGRGeometry *poGeom2);
 
-    /** 3D buffer operation
+    /** 3D buffer operation (requires SFCGAL 2.0.0+, not yet widely available)
      *
      * Computes a 3D buffer around a Point or LineString geometry.
      * The buffer radius is specified in the same units as the geometry.
-     * The result is a PolyhedralSurface.
+     * The result would be a PolyhedralSurface.
      *
      * @param poGeom Input geometry (must be Point or LineString)
      * @param dfDistance Buffer distance (must be positive)
      * @return PolyhedralSurface representing the 3D buffer, or nullptr on error
      *
-     * @note Requires SFCGAL 2.0.0 or later
-     * @note Only works on Point and LineString geometries
+     * @note Currently returns CPLE_NotSupported error - requires SFCGAL 2.0.0 or later
+     * @note This is a placeholder for future SFCGAL 2.0.0 support
      * @note For 2D buffer, use OGRGeometry::Buffer() instead (provided by GEOS)
      *
      * @since GDAL 3.13

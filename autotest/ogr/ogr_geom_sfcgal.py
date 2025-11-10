@@ -107,21 +107,20 @@ def test_ogr_geom_sfcgal_medial_axis_3d_error():
 # Test Buffer3D
 
 
-def test_ogr_geom_sfcgal_buffer3d_simple():
-    """Test Buffer3D on simple Point"""
+def test_ogr_geom_sfcgal_buffer3d_not_available():
+    """Test that Buffer3D returns not supported error (requires SFCGAL 2.0.0+)"""
 
     if not ogrtest.have_sfcgal():
         pytest.skip("SFCGAL not available")
 
-    # Buffer3D works on Point and LineString geometries
+    # Buffer3D requires SFCGAL 2.0.0+ which is not available in most distributions yet
     point = ogr.CreateGeometryFromWkt("POINT Z (0 0 0)")
-    buffered = point.Buffer3D(5.0)
 
-    assert buffered is not None, "Buffer3D returned None"
-    assert not buffered.IsEmpty(), "Buffered geometry should not be empty"
-    assert (
-        buffered.GetGeometryType() == ogr.wkbPolyhedralSurfaceZ
-    ), f"Expected PolyhedralSurface, got {buffered.GetGeometryName()}"
+    with gdal.quiet_errors():
+        with pytest.raises(
+            RuntimeError, match="Buffer3D requires SFCGAL 2.0.0 or later"
+        ):
+            point.Buffer3D(5.0)
 
 
 ###############################################################################
