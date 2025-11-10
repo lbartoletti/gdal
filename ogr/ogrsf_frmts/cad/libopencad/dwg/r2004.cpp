@@ -208,19 +208,36 @@ int DWGFileR2004::ReadHeader(enum OpenOptions eOptions)
         return result;
     }
 
-    // For now, we've successfully read the basic file structure
-    // Full header decompression and parsing will be added in next phase
-    // This allows R2004 files to be recognized and opened
-
-    std::cerr << "DWGFileR2004::ReadHeader() - Basic file structure read successfully\n";
     std::cerr << "DWGFileR2004::ReadHeader() - Found " << m_sectionLocators.size()
               << " section locators\n";
+
+    // Read and parse the system section map
+    // This contains metadata about header, classes, and other system sections
+    result = ReadSystemSectionMap();
+    if (result != CADErrorCodes::SUCCESS)
+    {
+        std::cerr << "DWGFileR2004::ReadHeader() - Failed to read system section map\n";
+        return result;
+    }
+
+    // Read and parse the data section map
+    // This contains the page structure for entity and object data
+    result = ReadDataSectionMap();
+    if (result != CADErrorCodes::SUCCESS)
+    {
+        std::cerr << "DWGFileR2004::ReadHeader() - Failed to read data section map\n";
+        return result;
+    }
+
+    std::cerr << "DWGFileR2004::ReadHeader() - File structure parsed successfully\n";
+
+    // TODO: Next phase - decompress and parse actual header variables
+    // For now, we've successfully read and parsed the section maps
+    // This allows us to locate and decompress any section in the file
 
     // Suppress unused parameter warning
     (void)eOptions;
 
-    // Return success - we've read enough to identify the file
-    // Full implementation will decompress and parse header variables
     return CADErrorCodes::SUCCESS;
 }
 
@@ -333,20 +350,280 @@ bool DWGFileR2004::VerifyCRC32(const char* data, size_t size, unsigned long expe
 
 int DWGFileR2004::ReadSystemSectionMap()
 {
-    // TODO: Implement system section map reading
-    // This will parse the system section to find header, classes, and other metadata
-    // For now, return success as placeholder
+    // System section locator is at index 0
+    if (m_sectionLocators.empty())
+    {
+        std::cerr << "DWGFileR2004::ReadSystemSectionMap() - "
+                  << "No section locators found - cannot read system section\n";
+        return CADErrorCodes::SECTION_LOCATOR_READ_FAILED;
+    }
 
-    std::cerr << "DWGFileR2004::ReadSystemSectionMap() - Placeholder implementation\n";
+    const SectionLocatorR2004& systemLocator = m_sectionLocators[0];
+
+    std::cerr << "Reading system section at offset " << systemLocator.nStartOffset
+              << " (size: " << systemLocator.nDataSize << ")\n";
+
+    // Decompress the system section
+    std::vector<char> decompressed;
+    int result = DecompressSection(systemLocator.nStartOffset,
+                                   systemLocator.nDataSize,
+                                   decompressed);
+
+    if (result != CADErrorCodes::SUCCESS)
+    {
+        std::cerr << "DWGFileR2004::ReadSystemSectionMap() - "
+                  << "Failed to decompress system section\n";
+        return result;
+    }
+
+    if (decompressed.empty())
+    {
+        std::cerr << "DWGFileR2004::ReadSystemSectionMap() - "
+                  << "System section decompressed to zero bytes\n";
+        return CADErrorCodes::FILE_PARSE_FAILED;
+    }
+
+    std::cerr << "System section decompressed to " << decompressed.size() << " bytes\n";
+
+    // Parse system section structure
+    // R2004 system section contains:
+    // - Section page map (describes page structure)
+    // - Section information (offsets to header, classes, etc.)
+
+    const unsigned char* data = reinterpret_cast<const unsigned char*>(decompressed.data());
+    size_t dataSize = decompressed.size();
+    size_t offset = 0;
+
+    // Read section page count (4 bytes, little-endian)
+    if (offset + 4 > dataSize)
+    {
+        std::cerr << "DWGFileR2004::ReadSystemSectionMap() - "
+                  << "System section truncated - cannot read page count\n";
+        return CADErrorCodes::FILE_PARSE_FAILED;
+    }
+
+    unsigned int pageCount = data[offset] | (data[offset+1] << 8) |
+                            (data[offset+2] << 16) | (data[offset+3] << 24);
+    offset += 4;
+
+    std::cerr << "System section contains " << pageCount << " pages\n";
+
+    // Validate page count (sanity check)
+    if (pageCount == 0 || pageCount > 1000)
+    {
+        std::cerr << "DWGFileR2004::ReadSystemSectionMap() - "
+                  << "Invalid system section page count: " << pageCount << "\n";
+        return CADErrorCodes::FILE_PARSE_FAILED;
+    }
+
+    // Read page map entries
+    m_systemPages.clear();
+    m_systemPages.reserve(pageCount);
+
+    for (unsigned int i = 0; i < pageCount; i++)
+    {
+        // Each page entry is 32 bytes:
+        // +00-07: Page offset (8 bytes, long)
+        // +08-11: Compressed size (4 bytes, int)
+        // +12-15: Uncompressed size (4 bytes, int)
+        // +16-23: Compressed checksum (8 bytes, long)
+        // +24-31: Uncompressed checksum (8 bytes, long)
+
+        if (offset + 32 > dataSize)
+        {
+            std::cerr << "DWGFileR2004::ReadSystemSectionMap() - "
+                      << "System section truncated - page entry " << i << " incomplete\n";
+            return CADErrorCodes::FILE_PARSE_FAILED;
+        }
+
+        SectionPageR2004 page;
+
+        // Page offset (8 bytes, little-endian)
+        page.nPageOffset = static_cast<long>(
+            data[offset] | (data[offset+1] << 8) |
+            (data[offset+2] << 16) | (data[offset+3] << 24) |
+            ((static_cast<long long>(data[offset+4])) << 32) |
+            ((static_cast<long long>(data[offset+5])) << 40) |
+            ((static_cast<long long>(data[offset+6])) << 48) |
+            ((static_cast<long long>(data[offset+7])) << 56)
+        );
+        offset += 8;
+
+        // Compressed size (4 bytes)
+        page.nCompressedSize = data[offset] | (data[offset+1] << 8) |
+                              (data[offset+2] << 16) | (data[offset+3] << 24);
+        offset += 4;
+
+        // Uncompressed size (4 bytes)
+        page.nUncompressedSize = data[offset] | (data[offset+1] << 8) |
+                                (data[offset+2] << 16) | (data[offset+3] << 24);
+        offset += 4;
+
+        // Compressed checksum (8 bytes)
+        page.nChecksumCompressed = data[offset] | (data[offset+1] << 8) |
+                                  (data[offset+2] << 16) | (data[offset+3] << 24) |
+                                  ((static_cast<long long>(data[offset+4])) << 32) |
+                                  ((static_cast<long long>(data[offset+5])) << 40) |
+                                  ((static_cast<long long>(data[offset+6])) << 48) |
+                                  ((static_cast<long long>(data[offset+7])) << 56);
+        offset += 8;
+
+        // Uncompressed checksum (8 bytes)
+        page.nChecksumUncompressed = data[offset] | (data[offset+1] << 8) |
+                                    (data[offset+2] << 16) | (data[offset+3] << 24) |
+                                    ((static_cast<long long>(data[offset+4])) << 32) |
+                                    ((static_cast<long long>(data[offset+5])) << 40) |
+                                    ((static_cast<long long>(data[offset+6])) << 48) |
+                                    ((static_cast<long long>(data[offset+7])) << 56);
+        offset += 8;
+
+        m_systemPages.push_back(page);
+    }
+
+    std::cerr << "Successfully parsed " << m_systemPages.size() << " system pages\n";
+
+    // Store system section offset for later use
+    m_nSystemSectionOffset = systemLocator.nStartOffset;
+
     return CADErrorCodes::SUCCESS;
 }
 
 int DWGFileR2004::ReadDataSectionMap()
 {
-    // TODO: Implement data section map reading
-    // This will parse the data section map to locate entity and object data
-    // For now, return success as placeholder
+    // Data section locator is at index 1
+    if (m_sectionLocators.size() < 2)
+    {
+        std::cerr << "DWGFileR2004::ReadDataSectionMap() - "
+                  << "Not enough section locators - cannot read data section\n";
+        return CADErrorCodes::SECTION_LOCATOR_READ_FAILED;
+    }
 
-    std::cerr << "DWGFileR2004::ReadDataSectionMap() - Placeholder implementation\n";
+    const SectionLocatorR2004& dataLocator = m_sectionLocators[1];
+
+    std::cerr << "Reading data section at offset " << dataLocator.nStartOffset
+              << " (size: " << dataLocator.nDataSize << ")\n";
+
+    // Decompress the data section
+    std::vector<char> decompressed;
+    int result = DecompressSection(dataLocator.nStartOffset,
+                                   dataLocator.nDataSize,
+                                   decompressed);
+
+    if (result != CADErrorCodes::SUCCESS)
+    {
+        std::cerr << "DWGFileR2004::ReadDataSectionMap() - "
+                  << "Failed to decompress data section\n";
+        return result;
+    }
+
+    if (decompressed.empty())
+    {
+        std::cerr << "DWGFileR2004::ReadDataSectionMap() - "
+                  << "Data section decompressed to zero bytes\n";
+        return CADErrorCodes::FILE_PARSE_FAILED;
+    }
+
+    std::cerr << "Data section decompressed to " << decompressed.size() << " bytes\n";
+
+    // Parse data section structure
+    // R2004 data section contains:
+    // - Section page map (describes page structure for entity data)
+    // - Object map (handle -> offset mapping)
+
+    const unsigned char* data = reinterpret_cast<const unsigned char*>(decompressed.data());
+    size_t dataSize = decompressed.size();
+    size_t offset = 0;
+
+    // Read section page count (4 bytes, little-endian)
+    if (offset + 4 > dataSize)
+    {
+        std::cerr << "DWGFileR2004::ReadDataSectionMap() - "
+                  << "Data section truncated - cannot read page count\n";
+        return CADErrorCodes::FILE_PARSE_FAILED;
+    }
+
+    unsigned int pageCount = data[offset] | (data[offset+1] << 8) |
+                            (data[offset+2] << 16) | (data[offset+3] << 24);
+    offset += 4;
+
+    std::cerr << "Data section contains " << pageCount << " pages\n";
+
+    // Validate page count (sanity check)
+    if (pageCount == 0 || pageCount > 10000)
+    {
+        std::cerr << "DWGFileR2004::ReadDataSectionMap() - "
+                  << "Invalid data section page count: " << pageCount << "\n";
+        return CADErrorCodes::FILE_PARSE_FAILED;
+    }
+
+    // Read page map entries
+    m_dataPages.clear();
+    m_dataPages.reserve(pageCount);
+
+    for (unsigned int i = 0; i < pageCount; i++)
+    {
+        // Each page entry is 32 bytes (same structure as system pages):
+        // +00-07: Page offset (8 bytes, long)
+        // +08-11: Compressed size (4 bytes, int)
+        // +12-15: Uncompressed size (4 bytes, int)
+        // +16-23: Compressed checksum (8 bytes, long)
+        // +24-31: Uncompressed checksum (8 bytes, long)
+
+        if (offset + 32 > dataSize)
+        {
+            std::cerr << "DWGFileR2004::ReadDataSectionMap() - "
+                      << "Data section truncated - page entry " << i << " incomplete\n";
+            return CADErrorCodes::FILE_PARSE_FAILED;
+        }
+
+        SectionPageR2004 page;
+
+        // Page offset (8 bytes, little-endian)
+        page.nPageOffset = static_cast<long>(
+            data[offset] | (data[offset+1] << 8) |
+            (data[offset+2] << 16) | (data[offset+3] << 24) |
+            ((static_cast<long long>(data[offset+4])) << 32) |
+            ((static_cast<long long>(data[offset+5])) << 40) |
+            ((static_cast<long long>(data[offset+6])) << 48) |
+            ((static_cast<long long>(data[offset+7])) << 56)
+        );
+        offset += 8;
+
+        // Compressed size (4 bytes)
+        page.nCompressedSize = data[offset] | (data[offset+1] << 8) |
+                              (data[offset+2] << 16) | (data[offset+3] << 24);
+        offset += 4;
+
+        // Uncompressed size (4 bytes)
+        page.nUncompressedSize = data[offset] | (data[offset+1] << 8) |
+                                (data[offset+2] << 16) | (data[offset+3] << 24);
+        offset += 4;
+
+        // Compressed checksum (8 bytes)
+        page.nChecksumCompressed = data[offset] | (data[offset+1] << 8) |
+                                  (data[offset+2] << 16) | (data[offset+3] << 24) |
+                                  ((static_cast<long long>(data[offset+4])) << 32) |
+                                  ((static_cast<long long>(data[offset+5])) << 40) |
+                                  ((static_cast<long long>(data[offset+6])) << 48) |
+                                  ((static_cast<long long>(data[offset+7])) << 56);
+        offset += 8;
+
+        // Uncompressed checksum (8 bytes)
+        page.nChecksumUncompressed = data[offset] | (data[offset+1] << 8) |
+                                    (data[offset+2] << 16) | (data[offset+3] << 24) |
+                                    ((static_cast<long long>(data[offset+4])) << 32) |
+                                    ((static_cast<long long>(data[offset+5])) << 40) |
+                                    ((static_cast<long long>(data[offset+6])) << 48) |
+                                    ((static_cast<long long>(data[offset+7])) << 56);
+        offset += 8;
+
+        m_dataPages.push_back(page);
+    }
+
+    std::cerr << "Successfully parsed " << m_dataPages.size() << " data pages\n";
+
+    // Store data section offset for later use
+    m_nDataSectionOffset = dataLocator.nStartOffset;
+
     return CADErrorCodes::SUCCESS;
 }
