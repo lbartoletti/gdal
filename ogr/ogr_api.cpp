@@ -21,6 +21,10 @@
 #include "ogr_geometry.h"
 #include "ogr_geos.h"
 
+#ifdef HAVE_SFCGAL
+#include <SFCGAL/capi/sfcgal_c.h>
+#endif
+
 static bool bNonLinearGeometriesEnabled = true;
 
 /************************************************************************/
