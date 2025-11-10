@@ -76,7 +76,6 @@ OGRSFCGALGeometryPtr OGRSFCGALOperations::ToSFCGAL(const OGRGeometry *poGeom)
 
     EnsureInitialized();
 
-    // Handle special geometry types that need conversion
     std::unique_ptr<OGRGeometry> poTempGeom;
 
     if (EQUAL(poGeom->getGeometryName(), "LINEARRING"))
@@ -108,7 +107,10 @@ OGRSFCGALGeometryPtr OGRSFCGALOperations::ToSFCGAL(const OGRGeometry *poGeom)
         poGeom = poTempGeom.get();
     }
 
-    // WKB-based conversion (SFCGAL >= 1.5.2)
+    sfcgal_geometry_t *sfcgalGeom = nullptr;
+
+#if SFCGAL_VERSION >= SFCGAL_MAKE_VERSION(1, 5, 2)
+    // Use WKB conversion for SFCGAL >= 1.5.2
     const size_t nSize = poGeom->WkbSize();
     unsigned char *pabyWkb =
         static_cast<unsigned char *>(CPLMalloc(nSize));
@@ -121,7 +123,6 @@ OGRSFCGALGeometryPtr OGRSFCGALOperations::ToSFCGAL(const OGRGeometry *poGeom)
     oOptions.eByteOrder = wkbNDR;
     oOptions.eWkbVariant = wkbVariantIso;
 
-    sfcgal_geometry_t *sfcgalGeom = nullptr;
     if (poGeom->exportToWkb(pabyWkb, &oOptions) == OGRERR_NONE)
     {
         sfcgalGeom = sfcgal_io_read_wkb(
@@ -129,6 +130,16 @@ OGRSFCGALGeometryPtr OGRSFCGALOperations::ToSFCGAL(const OGRGeometry *poGeom)
     }
 
     CPLFree(pabyWkb);
+#else
+    // Use WKT conversion for SFCGAL < 1.5.2
+    char *pszWKT = nullptr;
+    if (poGeom->exportToWkt(&pszWKT, wkbVariantIso) == OGRERR_NONE && pszWKT)
+    {
+        sfcgalGeom = sfcgal_io_read_wkt(pszWKT, strlen(pszWKT));
+        CPLFree(pszWKT);
+    }
+#endif
+
     return OGRSFCGALGeometryPtr(sfcgalGeom);
 }
 
@@ -145,24 +156,33 @@ OGRGeometry *OGRSFCGALOperations::FromSFCGAL(const sfcgal_geometry_t *geometry)
 
     EnsureInitialized();
 
-    char *pabySFCGAL = nullptr;
+    OGRGeometry *poGeom = nullptr;
+
+#if SFCGAL_VERSION >= SFCGAL_MAKE_VERSION(1, 5, 2)
+    // Use WKB conversion for SFCGAL >= 1.5.2
+    char *pabyWKB = nullptr;
     size_t nLength = 0;
 
-    sfcgal_geometry_as_wkb(geometry, &pabySFCGAL, &nLength);
+    sfcgal_geometry_as_wkb(geometry, &pabyWKB, &nLength);
 
-    if (!pabySFCGAL || nLength == 0)
+    if (pabyWKB && nLength > 0)
     {
-        return nullptr;
+        OGRGeometryFactory::createFromWkb(
+            reinterpret_cast<unsigned char *>(pabyWKB), nullptr, &poGeom,
+            nLength);
+        free(pabyWKB);
     }
+#else
+    // Use WKT conversion for SFCGAL < 1.5.2
+    char *pszWKT = sfcgal_geometry_as_text(geometry);
+    if (pszWKT)
+    {
+        OGRGeometryFactory::createFromWkt(pszWKT, nullptr, &poGeom);
+        free(pszWKT);
+    }
+#endif
 
-    OGRGeometry *poGeom = nullptr;
-    const OGRErr eErr = OGRGeometryFactory::createFromWkb(
-        reinterpret_cast<unsigned char *>(pabySFCGAL), nullptr, &poGeom,
-        nLength);
-
-    free(pabySFCGAL);
-
-    return (eErr == OGRERR_NONE) ? poGeom : nullptr;
+    return poGeom;
 }
 
 /************************************************************************/

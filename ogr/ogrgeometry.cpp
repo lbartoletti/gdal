@@ -3674,7 +3674,7 @@ double OGRGeometry::Distance3D(
     CPLError(CE_Failure, CPLE_NotSupported, "SFCGAL support not enabled.");
     return -1.0;
 #else
-    // Delegate to OGRSFCGALOperations for thread-safe, RAII-based implementation
+    // Delegate to OGRSFCGALOperations
     return OGRSFCGALOperations::Distance3D(this, poOtherGeom);
 #endif
 }
