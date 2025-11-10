@@ -15,6 +15,7 @@
 #include "opencad_api.h"
 #include "cadfilestreamio.h"
 #include "dwg/r2000.h"
+#include "dwg/r2004.h"
 
 #include <cctype>
 #include <cstdarg>
@@ -83,6 +84,9 @@ CADFile * OpenCADFile( CADFileIO * pCADFileIO, enum CADFile::OpenOptions eOption
     {
         case CADVersions::DWG_R2000:
             poCAD = new DWGFileR2000( pCADFileIO );
+            break;
+        case CADVersions::DWG_R2004:
+            poCAD = new DWGFileR2004( pCADFileIO );
             break;
         default:
             gLastError = CADErrorCodes::UNSUPPORTED_VERSION;

@@ -59,7 +59,7 @@ struct DWG2000Cehd
     CADHandle hplotstyle;
 };
 
-class DWGFileR2000 final : public CADFile
+class DWGFileR2000 : public CADFile
 {
 public:
     explicit             DWGFileR2000( CADFileIO * poFileIO );

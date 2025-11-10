@@ -2,6 +2,8 @@ add_library(
   libopencad OBJECT
   dwg/io.cpp
   dwg/r2000.cpp
+  dwg/r2004.cpp
+  dwg/lz77.cpp
   cadclasses.cpp
   cadcolors.cpp
   caddictionary.cpp
