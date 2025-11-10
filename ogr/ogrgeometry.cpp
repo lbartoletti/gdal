@@ -3711,6 +3711,92 @@ double OGR_G_Distance3D(OGRGeometryH hFirst, OGRGeometryH hOther)
         OGRGeometry::FromHandle(hOther));
 }
 
+#ifdef HAVE_SFCGAL
+
+/************************************************************************/
+/*                           OGR_G_Buffer3D()                           */
+/************************************************************************/
+
+/**
+ * \brief Compute a 3D buffer around a geometry (NOT YET IMPLEMENTED).
+ *
+ * This function is a C wrapper for OGRGeometry::Buffer3D().
+ *
+ * NOTE: This function currently returns NULL with CPLE_NotSupported error.
+ * SFCGAL does not provide a direct 3D buffer function in its C API.
+ *
+ * @param hGeom the geometry.
+ * @param dfDistance the buffer distance to be applied.
+ *
+ * @return the newly created geometry (NULL on error or not implemented).
+ *
+ * @since GDAL 3.11
+ */
+
+OGRGeometryH OGR_G_Buffer3D(OGRGeometryH hGeom, double dfDistance)
+{
+    VALIDATE_POINTER1(hGeom, "OGR_G_Buffer3D", nullptr);
+
+    return OGRGeometry::ToHandle(
+        OGRGeometry::FromHandle(hGeom)->Buffer3D(dfDistance));
+}
+
+/************************************************************************/
+/*                       OGR_G_StraightSkeleton()                       */
+/************************************************************************/
+
+/**
+ * \brief Compute the straight skeleton of a polygon.
+ *
+ * This function is a C wrapper for OGRGeometry::StraightSkeleton().
+ *
+ * The straight skeleton is a 2D algorithm used in computational geometry.
+ * Only 2D polygons are supported (no Z coordinates).
+ *
+ * @param hGeom the geometry (must be a 2D polygon).
+ *
+ * @return the newly created MultiLineString geometry (NULL on error).
+ *
+ * @since GDAL 3.11
+ */
+
+OGRGeometryH OGR_G_StraightSkeleton(OGRGeometryH hGeom)
+{
+    VALIDATE_POINTER1(hGeom, "OGR_G_StraightSkeleton", nullptr);
+
+    return OGRGeometry::ToHandle(
+        OGRGeometry::FromHandle(hGeom)->StraightSkeleton());
+}
+
+/************************************************************************/
+/*                   OGR_G_ApproximateMedialAxis()                      */
+/************************************************************************/
+
+/**
+ * \brief Compute the approximate medial axis of a polygon.
+ *
+ * This function is a C wrapper for OGRGeometry::ApproximateMedialAxis().
+ *
+ * The medial axis (also known as topological skeleton) is a 2D algorithm.
+ * Only 2D polygons are supported (no Z coordinates).
+ *
+ * @param hGeom the geometry (must be a 2D polygon).
+ *
+ * @return the newly created MultiLineString geometry (NULL on error).
+ *
+ * @since GDAL 3.11
+ */
+
+OGRGeometryH OGR_G_ApproximateMedialAxis(OGRGeometryH hGeom)
+{
+    VALIDATE_POINTER1(hGeom, "OGR_G_ApproximateMedialAxis", nullptr);
+
+    return OGRGeometry::ToHandle(
+        OGRGeometry::FromHandle(hGeom)->ApproximateMedialAxis());
+}
+
+#endif  // HAVE_SFCGAL
+
 /************************************************************************/
 /*                       OGRGeometryRebuildCurves()                     */
 /************************************************************************/

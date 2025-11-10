@@ -3947,6 +3947,23 @@ public:
   }
 %clear OGRGeometryShadow* other;
 
+#ifdef HAVE_SFCGAL
+  %newobject Buffer3D;
+  OGRGeometryShadow* Buffer3D( double dfDistance ) {
+    return (OGRGeometryShadow*) OGR_G_Buffer3D( self, dfDistance );
+  }
+
+  %newobject StraightSkeleton;
+  OGRGeometryShadow* StraightSkeleton() {
+    return (OGRGeometryShadow*) OGR_G_StraightSkeleton( self );
+  }
+
+  %newobject ApproximateMedialAxis;
+  OGRGeometryShadow* ApproximateMedialAxis() {
+    return (OGRGeometryShadow*) OGR_G_ApproximateMedialAxis( self );
+  }
+#endif
+
   void Empty () {
     OGR_G_Empty(self);
   }
