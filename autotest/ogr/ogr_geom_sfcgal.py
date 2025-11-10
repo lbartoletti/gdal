@@ -119,12 +119,9 @@ def test_ogr_geom_sfcgal_buffer3d():
     with gdal.quiet_errors():
         buffered = point.Buffer3D(5.0)
 
-    # If SFCGAL < 2.0.0, buffered will be None (error occurred)
     # If SFCGAL >= 2.0.0, buffered should be a PolyhedralSurface
-    if buffered is None:
-        # SFCGAL < 2.0.0 - expected behavior
-        pass
-    else:
+    # If SFCGAL < 2.0.0, buffered will be None (expected)
+    if buffered is not None:
         # SFCGAL >= 2.0.0 - verify result
         assert not buffered.IsEmpty(), "Buffered geometry should not be empty"
         assert (
