@@ -92,6 +92,23 @@ private:
     bool ReadCompressedInt(const char* input, size_t& inputPos,
                           size_t inputSize, unsigned int& value);
 
+    /**
+     * @brief Copy bytes from sliding window (backreference)
+     *
+     * Implements the LZ77 sliding window copy operation. Handles overlapping
+     * regions correctly (when length > offset, creates repeating pattern).
+     *
+     * @param output Output buffer
+     * @param outputPos Current position in output (updated)
+     * @param outputSize Total output buffer size
+     * @param offset Distance back in the output to copy from
+     * @param length Number of bytes to copy
+     * @return true if successful, false on error
+     */
+    bool CopyFromWindow(unsigned char* output, size_t& outputPos,
+                       size_t outputSize, unsigned int offset,
+                       unsigned int length);
+
     std::string m_lastError;  ///< Last error message
 };
 
