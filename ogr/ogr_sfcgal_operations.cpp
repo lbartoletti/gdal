@@ -457,15 +457,69 @@ bool OGRSFCGALOperations::Intersects3D(const OGRGeometry *poGeom1,
 OGRGeometry *OGRSFCGALOperations::Buffer3D(const OGRGeometry *poGeom,
                                            double dfDistance)
 {
+#if SFCGAL_VERSION < SFCGAL_MAKE_VERSION(2, 0, 0)
     CPL_IGNORE_RET_VAL(poGeom);
     CPL_IGNORE_RET_VAL(dfDistance);
 
     CPLError(CE_Failure, CPLE_NotSupported,
              "Buffer3D requires SFCGAL 2.0.0 or later. "
-             "Current SFCGAL version is %s. "
-             "The sfcgal_geometry_buffer3d function is not available in older SFCGAL versions.",
+             "Current SFCGAL version is %s.",
              sfcgal_version());
     return nullptr;
+#else
+    if (!poGeom)
+    {
+        CPLError(CE_Failure, CPLE_AppDefined,
+                 "NULL geometry passed to Buffer3D");
+        return nullptr;
+    }
+
+    if (dfDistance <= 0)
+    {
+        CPLError(CE_Failure, CPLE_AppDefined,
+                 "Buffer3D requires a positive distance (got %f)", dfDistance);
+        return nullptr;
+    }
+
+    const OGRwkbGeometryType eType = wkbFlatten(poGeom->getGeometryType());
+    if (eType != wkbPoint && eType != wkbLineString)
+    {
+        CPLError(CE_Failure, CPLE_AppDefined,
+                 "Buffer3D only works on Point and LineString geometries (got %s)",
+                 poGeom->getGeometryName());
+        return nullptr;
+    }
+
+    auto poThis = ToSFCGAL(poGeom);
+    if (!poThis)
+    {
+        CPLError(CE_Failure, CPLE_AppDefined,
+                 "Failed to convert geometry to SFCGAL format");
+        return nullptr;
+    }
+
+    // Use default parameters: 8 segments, ROUND buffer type
+    constexpr int nSegments = 8;
+
+    OGRSFCGALGeometryPtr poRes(
+        sfcgal_geometry_buffer3d(poThis.get(), dfDistance, nSegments,
+                                static_cast<sfcgal_buffer3d_type_t>(0)));  // ROUND
+
+    if (!poRes)
+    {
+        CPLError(CE_Failure, CPLE_AppDefined,
+                 "SFCGAL Buffer3D operation failed");
+        return nullptr;
+    }
+
+    OGRGeometry *poResult = FromSFCGAL(poRes.get());
+    if (poResult && poGeom->getSpatialReference())
+    {
+        poResult->assignSpatialReference(poGeom->getSpatialReference());
+    }
+
+    return poResult;
+#endif
 }
 
 /************************************************************************/

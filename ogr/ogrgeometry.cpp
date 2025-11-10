@@ -3716,15 +3716,14 @@ double OGR_G_Distance3D(OGRGeometryH hFirst, OGRGeometryH hOther)
 /************************************************************************/
 
 /**
- * \brief Compute a 3D buffer around a geometry (requires SFCGAL 2.0.0+).
+ * \brief Compute a 3D buffer around a geometry.
  *
  * This function is a C wrapper for OGRGeometry::Buffer3D().
  *
  * Computes a 3D buffer around a Point or LineString geometry.
- * The result would be a PolyhedralSurface.
+ * The result is a PolyhedralSurface.
  *
- * NOTE: Currently returns NULL with CPLE_NotSupported error.
- * Requires SFCGAL 2.0.0 or later, which is not yet widely available.
+ * Requires SFCGAL 2.0.0 or later at compile time.
  *
  * @param hGeom the geometry (must be Point or LineString).
  * @param dfDistance the buffer distance (must be positive).
@@ -8992,20 +8991,19 @@ IOGRConstGeometryVisitor::~IOGRConstGeometryVisitor() = default;
 /************************************************************************/
 
 /**
- * \brief Compute 3D buffer around geometry (requires SFCGAL 2.0.0+)
+ * \brief Compute 3D buffer around geometry
  *
  * Computes a 3D buffer around a Point or LineString geometry.
  * The buffer radius is specified in the same units as the geometry.
- * The result would be a PolyhedralSurface.
+ * The result is a PolyhedralSurface.
  *
- * This method requires SFCGAL 2.0.0 or later, which is not yet widely available.
- * Currently returns CPLE_NotSupported error.
+ * This method requires SFCGAL 2.0.0 or later at compile time.
  *
  * @param dfDistance Buffer distance (must be positive)
  * @return PolyhedralSurface representing the 3D buffer, or nullptr on error
  *
- * @note Currently not supported - requires SFCGAL 2.0.0 or later
- * @note This is a placeholder for future SFCGAL 2.0.0 support
+ * @note Requires SFCGAL 2.0.0 or later at compile time
+ * @note Only works on Point and LineString geometries
  * @note For 2D buffer, use Buffer() instead (provided by GEOS)
  *
  * @since GDAL 3.13
