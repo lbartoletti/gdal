@@ -592,6 +592,12 @@ class CPL_DLL OGRGeometry
 
     virtual double Distance3D(const OGRGeometry *poOtherGeom) const;
 
+#ifdef HAVE_SFCGAL
+    OGRGeometry *Buffer3D(double dfDistance) const CPL_WARN_UNUSED_RESULT;
+    OGRGeometry *StraightSkeleton() const CPL_WARN_UNUSED_RESULT;
+    OGRGeometry *ApproximateMedialAxis() const CPL_WARN_UNUSED_RESULT;
+#endif
+
     OGRGeometry *SetPrecision(double dfGridSize, int nFlags) const;
 
     virtual bool hasEmptyParts() const;

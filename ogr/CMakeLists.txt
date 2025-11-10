@@ -12,6 +12,7 @@ add_library(
   ogrutils.cpp
   ogrgeomcoordinateprecision.cpp
   ogrgeometry.cpp
+  ogr_sfcgal_operations.cpp
   ogrgeometrycollection.cpp
   ogrmultipolygon.cpp
   ogrsurface.cpp

@@ -33,6 +33,7 @@
 #include "ogr_core.h"
 #include "ogr_geos.h"
 #include "ogr_sfcgal.h"
+#include "ogr_sfcgal_operations.h"
 #include "ogr_libs.h"
 #include "ogr_p.h"
 #include "ogr_spatialref.h"
@@ -3668,46 +3669,13 @@ double OGR_G_Distance(OGRGeometryH hFirst, OGRGeometryH hOther)
 double OGRGeometry::Distance3D(
     UNUSED_IF_NO_SFCGAL const OGRGeometry *poOtherGeom) const
 {
-    if (poOtherGeom == nullptr)
-    {
-        CPLDebug("OGR",
-                 "OGRTriangle::Distance3D called with NULL geometry pointer");
-        return -1.0;
-    }
-
-    if (!(poOtherGeom->Is3D() && Is3D()))
-    {
-        CPLDebug("OGR", "OGRGeometry::Distance3D called with two dimensional "
-                        "geometry(geometries)");
-        return -1.0;
-    }
-
 #ifndef HAVE_SFCGAL
-
+    CPL_IGNORE_RET_VAL(poOtherGeom);
     CPLError(CE_Failure, CPLE_NotSupported, "SFCGAL support not enabled.");
     return -1.0;
-
 #else
-
-    sfcgal_init();
-    sfcgal_geometry_t *poThis = OGRGeometry::OGRexportToSFCGAL(this);
-    if (poThis == nullptr)
-        return -1.0;
-
-    sfcgal_geometry_t *poOther = OGRGeometry::OGRexportToSFCGAL(poOtherGeom);
-    if (poOther == nullptr)
-    {
-        sfcgal_geometry_delete(poThis);
-        return -1.0;
-    }
-
-    const double dfDistance = sfcgal_geometry_distance_3d(poThis, poOther);
-
-    sfcgal_geometry_delete(poThis);
-    sfcgal_geometry_delete(poOther);
-
-    return dfDistance > 0 ? dfDistance : -1.0;
-
+    // Delegate to OGRSFCGALOperations for thread-safe, RAII-based implementation
+    return OGRSFCGALOperations::Distance3D(this, poOtherGeom);
 #endif
 }
 
@@ -8929,3 +8897,116 @@ IOGRGeometryVisitor::~IOGRGeometryVisitor() = default;
 /************************************************************************/
 
 IOGRConstGeometryVisitor::~IOGRConstGeometryVisitor() = default;
+
+#ifdef HAVE_SFCGAL
+
+/************************************************************************/
+/*                             Buffer3D()                               */
+/************************************************************************/
+
+/**
+ * \brief Compute 3D buffer around geometry
+ *
+ * Creates a 3D buffer (offset) around the geometry at the specified distance.
+ * Works on both 2D and 3D geometries. The result is typically a
+ * PolyhedralSurface for 3D inputs, or an extruded polygon for 2D inputs.
+ *
+ * This method is built on the SFCGAL library. If OGR is built without SFCGAL,
+ * this method will return nullptr.
+ *
+ * @param dfDistance Buffer distance (same units as geometry coordinates)
+ * @return Buffered geometry, or nullptr on error
+ *
+ * @note For 2D buffer, use Buffer() instead (provided by GEOS, faster)
+ * @note Thread-safe since GDAL 3.11
+ *
+ * @since GDAL 3.11
+ * @see Buffer() for 2D buffer operation
+ */
+OGRGeometry *OGRGeometry::Buffer3D(double dfDistance) const
+{
+    return OGRSFCGALOperations::Buffer3D(this, dfDistance);
+}
+
+/************************************************************************/
+/*                         StraightSkeleton()                           */
+/************************************************************************/
+
+/**
+ * \brief Compute straight skeleton (2D only)
+ *
+ * Computes the straight skeleton of a 2D polygon. The straight skeleton
+ * is the locus of points having more than one closest point on the
+ * polygon boundary. It's widely used in:
+ * - Architecture: automatic roof construction
+ * - Urban planning: block and parcel analysis
+ * - Computational geometry: polygon partitioning
+ *
+ * This method is built on the SFCGAL library. If OGR is built without SFCGAL,
+ * this method will return nullptr.
+ *
+ * @return MultiLineString representing the skeleton, or nullptr on error
+ *
+ * @note Only works on 2D polygons (Is3D() must be FALSE)
+ * @note Input must be a simple Polygon (no self-intersections)
+ * @note Thread-safe since GDAL 3.11
+ *
+ * Example:
+ * \code{.cpp}
+ *   OGRPolygon building;
+ *   // ... define building footprint ...
+ *   OGRGeometry* skeleton = building.StraightSkeleton();
+ *   // Use skeleton for roof ridge line generation
+ * \endcode
+ *
+ * @since GDAL 3.11
+ * @see ApproximateMedialAxis() for an alternative skeleton representation
+ */
+OGRGeometry *OGRGeometry::StraightSkeleton() const
+{
+    return OGRSFCGALOperations::StraightSkeleton(this);
+}
+
+/************************************************************************/
+/*                      ApproximateMedialAxis()                         */
+/************************************************************************/
+
+/**
+ * \brief Compute approximate medial axis (2D only)
+ *
+ * Computes the approximate medial axis (topological skeleton) of a 2D
+ * polygon. The medial axis is the set of points having more than one
+ * closest point on the boundary, represented as a graph structure.
+ *
+ * Unlike StraightSkeleton(), the medial axis uses circular arcs rather
+ * than straight line segments, providing a different decomposition useful
+ * for shape analysis and morphological operations.
+ *
+ * This method is built on the SFCGAL library. If OGR is built without SFCGAL,
+ * this method will return nullptr.
+ *
+ * @return MultiLineString representing the approximate medial axis,
+ *         or nullptr on error
+ *
+ * @note Only works on 2D polygons (Is3D() must be FALSE)
+ * @note This is an approximation; exact medial axis computation is very
+ *       expensive computationally
+ * @note Thread-safe since GDAL 3.11
+ *
+ * Example:
+ * \code{.cpp}
+ *   OGRPolygon polygon;
+ *   // ... define polygon ...
+ *   OGRGeometry* axis = polygon.ApproximateMedialAxis();
+ *   // Use for shape analysis
+ * \endcode
+ *
+ * @since GDAL 3.11
+ * @see StraightSkeleton() for straight skeleton computation
+ */
+OGRGeometry *OGRGeometry::ApproximateMedialAxis() const
+{
+    return OGRSFCGALOperations::ApproximateMedialAxis(this);
+}
+
+#endif  // HAVE_SFCGAL
