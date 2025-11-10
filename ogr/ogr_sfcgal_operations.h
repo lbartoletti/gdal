@@ -17,6 +17,18 @@
 #include <SFCGAL/capi/sfcgal_c.h>
 #include <mutex>
 
+// SFCGAL version checking macros
+#ifndef SFCGAL_MAKE_VERSION
+#define SFCGAL_MAKE_VERSION(major, minor, patch)                               \
+    ((major)*10000 + (minor)*100 + (patch))
+#endif
+
+#ifndef SFCGAL_VERSION
+#define SFCGAL_VERSION                                                         \
+    SFCGAL_MAKE_VERSION(SFCGAL_VERSION_MAJOR, SFCGAL_VERSION_MINOR,            \
+                        SFCGAL_VERSION_PATCH)
+#endif
+
 /************************************************************************/
 /*                      OGRSFCGALGeometryPtr                            */
 /*  RAII wrapper for sfcgal_geometry_t - automatic memory management   */
