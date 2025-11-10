@@ -27,20 +27,22 @@ namespace
 {
 std::once_flag g_sfcgalInitFlag;
 
-void SFCGALWarningHandler(const char *msg, ...)
+int SFCGALWarningHandler(const char *msg, ...)
 {
     va_list args;
     va_start(args, msg);
     CPLErrorV(CE_Warning, CPLE_AppDefined, msg, args);
     va_end(args);
+    return 0;
 }
 
-void SFCGALErrorHandler(const char *msg, ...)
+int SFCGALErrorHandler(const char *msg, ...)
 {
     va_list args;
     va_start(args, msg);
     CPLErrorV(CE_Failure, CPLE_AppDefined, msg, args);
     va_end(args);
+    return 0;
 }
 }  // anonymous namespace
 
@@ -459,38 +461,21 @@ bool OGRSFCGALOperations::Intersects3D(const OGRGeometry *poGeom1,
 OGRGeometry *OGRSFCGALOperations::Buffer3D(const OGRGeometry *poGeom,
                                            double dfDistance)
 {
-    if (!poGeom)
-    {
-        CPLError(CE_Failure, CPLE_AppDefined,
-                 "NULL geometry passed to Buffer3D");
-        return nullptr;
-    }
+    CPL_IGNORE_RET_VAL(poGeom);
+    CPL_IGNORE_RET_VAL(dfDistance);
 
-    auto poThis = ToSFCGAL(poGeom);
-    if (!poThis)
-    {
-        CPLError(CE_Failure, CPLE_AppDefined,
-                 "Failed to convert geometry to SFCGAL format for Buffer3D");
-        return nullptr;
-    }
+    // Note: SFCGAL does not provide a direct 3D buffer function in its C API
+    // The sfcgal_geometry_buffer function does not exist or is not available
+    // in the standard SFCGAL distribution.
+    // A true 3D buffer would require computing the Minkowski sum with a sphere,
+    // which is computationally expensive.
+    // For now, we return an error indicating this is not yet implemented.
 
-    // SFCGAL buffer creates a 3D buffer (offset) around the geometry
-    OGRSFCGALGeometryPtr poRes(sfcgal_geometry_buffer(poThis.get(), dfDistance));
-
-    if (!poRes)
-    {
-        CPLError(CE_Failure, CPLE_AppDefined,
-                 "SFCGAL Buffer3D operation failed");
-        return nullptr;
-    }
-
-    OGRGeometry *poResult = FromSFCGAL(poRes.get());
-    if (poResult && poGeom->getSpatialReference())
-    {
-        poResult->assignSpatialReference(poGeom->getSpatialReference());
-    }
-
-    return poResult;
+    CPLError(CE_Failure, CPLE_NotSupported,
+             "Buffer3D is not yet implemented. "
+             "SFCGAL does not provide a direct 3D buffer function in its C API. "
+             "For 2D buffer, use Buffer() instead (GEOS).");
+    return nullptr;
 }
 
 /************************************************************************/

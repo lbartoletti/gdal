@@ -106,34 +106,24 @@ def test_ogr_geom_sfcgal_medial_axis_3d_error():
 
 
 ###############################################################################
-# Test Buffer3D basic functionality
+# Test Buffer3D - Note: Currently not implemented
 
 
-def test_ogr_geom_sfcgal_buffer3d_point():
-    """Test 3D buffer on point"""
+def test_ogr_geom_sfcgal_buffer3d_not_implemented():
+    """Test that Buffer3D returns not supported error"""
 
     if not ogrtest.have_sfcgal():
         pytest.skip("SFCGAL not available")
 
-    # 3D point
+    # Buffer3D is not yet implemented in SFCGAL C API
+    # It should return None with an error
     point = ogr.CreateGeometryFromWkt("POINT Z (0 0 0)")
-    buffer = point.Buffer3D(5.0)
 
-    assert buffer is not None, "Buffer3D returned None"
-    assert buffer.Is3D(), "Buffer3D result should be 3D"
+    with gdal.quiet_errors():
+        buffer = point.Buffer3D(5.0)
 
-
-def test_ogr_geom_sfcgal_buffer3d_polygon():
-    """Test 3D buffer on 2D polygon"""
-
-    if not ogrtest.have_sfcgal():
-        pytest.skip("SFCGAL not available")
-
-    # 2D polygon
-    polygon = ogr.CreateGeometryFromWkt("POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))")
-    buffer = polygon.Buffer3D(2.0)
-
-    assert buffer is not None, "Buffer3D on 2D polygon returned None"
+    # Should return None because not implemented
+    assert buffer is None, "Buffer3D should return None (not yet implemented)"
 
 
 ###############################################################################

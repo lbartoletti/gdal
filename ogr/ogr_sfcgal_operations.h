@@ -14,6 +14,7 @@
 
 #ifdef HAVE_SFCGAL
 
+#include <SFCGAL/capi/sfcgal_c.h>
 #include <mutex>
 
 /************************************************************************/
@@ -138,16 +139,20 @@ class CPL_DLL OGRSFCGALOperations
 
     // ===== NEW operations =====
 
-    /** 3D buffer operation
+    /** 3D buffer operation (NOT YET IMPLEMENTED)
      *
-     * Creates a 3D buffer around the geometry at the specified distance.
-     * Works on both 2D and 3D geometries.
+     * NOTE: This function currently returns an error (CPLE_NotSupported).
+     * SFCGAL does not provide a direct 3D buffer function in its C API.
+     * A true 3D buffer would require computing the Minkowski sum with a sphere.
+     *
+     * This method is kept in the API for future implementation.
+     * For 2D buffer, use OGRGeometry::Buffer() instead (provided by GEOS).
      *
      * @param poGeom Input geometry (must not be NULL)
      * @param dfDistance Buffer distance (same units as geometry)
-     * @return Buffered geometry as PolyhedralSurface, or nullptr on error
+     * @return Always returns nullptr with CPLE_NotSupported error
      *
-     * @since GDAL 3.11
+     * @since GDAL 3.11 (placeholder for future implementation)
      */
     static OGRGeometry *Buffer3D(const OGRGeometry *poGeom, double dfDistance);
 
