@@ -592,8 +592,6 @@ class CPL_DLL OGRGeometry
 
     virtual double Distance3D(const OGRGeometry *poOtherGeom) const;
 
-    // SFCGAL-specific methods (require SFCGAL at runtime)
-    // Note: Buffer3D not yet implemented - returns CPLE_NotSupported error
     OGRGeometry *Buffer3D(double dfDistance) const CPL_WARN_UNUSED_RESULT;
     OGRGeometry *StraightSkeleton() const CPL_WARN_UNUSED_RESULT;
     OGRGeometry *ApproximateMedialAxis() const CPL_WARN_UNUSED_RESULT;

@@ -104,22 +104,24 @@ def test_ogr_geom_sfcgal_medial_axis_3d_error():
 
 
 ###############################################################################
-# Test Buffer3D - Note: Currently not implemented
+# Test Buffer3D
 
 
-def test_ogr_geom_sfcgal_buffer3d_not_implemented():
-    """Test that Buffer3D returns not supported error"""
+def test_ogr_geom_sfcgal_buffer3d_simple():
+    """Test Buffer3D on simple Point"""
 
     if not ogrtest.have_sfcgal():
         pytest.skip("SFCGAL not available")
 
-    # Buffer3D is not yet implemented in SFCGAL C API
-    # It should raise a RuntimeError
+    # Buffer3D works on Point and LineString geometries
     point = ogr.CreateGeometryFromWkt("POINT Z (0 0 0)")
+    buffered = point.Buffer3D(5.0)
 
-    with gdal.quiet_errors():
-        with pytest.raises(RuntimeError, match="Buffer3D is not yet implemented"):
-            point.Buffer3D(5.0)
+    assert buffered is not None, "Buffer3D returned None"
+    assert not buffered.IsEmpty(), "Buffered geometry should not be empty"
+    assert (
+        buffered.GetGeometryType() == ogr.wkbPolyhedralSurfaceZ
+    ), f"Expected PolyhedralSurface, got {buffered.GetGeometryName()}"
 
 
 ###############################################################################
@@ -170,3 +172,77 @@ def test_ogr_geom_sfcgal_medial_axis_non_polygon():
     with gdal.quiet_errors():
         with pytest.raises(RuntimeError, match="only works on Polygon geometries"):
             point.ApproximateMedialAxis()
+
+
+###############################################################################
+# Tests migrated from ogr_geom.py
+
+
+def test_ogr_geom_triangle_sfcgal():
+    """Test SFCGAL operations on Triangle geometries"""
+
+    if not ogrtest.have_sfcgal():
+        pytest.skip("SFCGAL is not available")
+
+    g1 = ogr.CreateGeometryFromWkt("TRIANGLE ((0 0,100 0 100,0 100 100,0 0))")
+    g2 = ogr.CreateGeometryFromWkt("TRIANGLE ((-1 -1,100 0 100,0 100 100,-1 -1))")
+    assert g2.Intersects(g1)
+
+    g1 = ogr.CreateGeometryFromWkt("TRIANGLE ((0 0,1 0,0 1,0 0))")
+    g2 = ogr.CreateGeometryFromWkt("TRIANGLE ((0 0,1 0,1 1,0 0))")
+    g3 = g1.Intersection(g2)
+    g4 = ogr.CreateGeometryFromWkt("TRIANGLE ((0.5 0.5 0,0 0 0,1 0 0,0.5 0.5 0))")
+    assert g4.Equals(g3)
+
+
+def test_ogr_geom_sfcgal():
+    """Test SFCGAL with various geometry types"""
+
+    if not ogrtest.have_sfcgal():
+        pytest.skip("SFCGAL is not available")
+
+    g1 = ogr.CreateGeometryFromWkt("TIN EMPTY")
+
+    g2_poly = ogr.CreateGeometryFromWkt("POLYGON((0 0,0 1,1 1,0 0))")
+    g2 = g2_poly.GetGeometryRef(0)
+    g1.Distance(g2)
+
+    g2 = ogr.CreateGeometryFromWkt("CIRCULARSTRING EMPTY")
+    g1.Distance(g2)
+
+    g2 = ogr.CreateGeometryFromWkt("CURVEPOLYGON EMPTY")
+    g1.Distance(g2)
+
+
+def test_ogr_geom_sfcgal_distance3D():
+    """Test Distance3D with SFCGAL"""
+
+    if not ogrtest.have_sfcgal():
+        pytest.skip("SFCGAL is not available")
+
+    point1 = ogr.CreateGeometryFromWkt("POINT (1.0 1.0 1.0)")
+    point2 = ogr.CreateGeometryFromWkt("POINT (4.0 1.0 5.0)")
+
+    assert point1.Distance3D(point2) == 5.0
+
+
+def test_ogr_geom_sfcgal_intersection3D():
+    """Test 3D intersection with SFCGAL"""
+
+    if not ogrtest.have_sfcgal():
+        pytest.skip("SFCGAL is not available")
+
+    phsurface = ogr.CreateGeometryFromWkt(
+        "POLYHEDRALSURFACE Z (((0 0 0,0 0 2,0 2 2,0 2 0,0 0 0)),"
+        "((0 0 0,0 2 0,2 2 0,2 0 0,0 0 0)),"
+        "((0 0 0,2 0 0,2 0 2,0 0 2,0 0 0)),"
+        "((2 2 0,2 2 2,2 0 2,2 0 0,2 2 0)),"
+        "((0 2 0,0 2 2,2 2 2,2 2 0,0 2 0)),"
+        "((0 0 2,2 0 2,2 2 2,0 2 2,0 0 2)))"
+    )
+
+    line = ogr.CreateGeometryFromWkt("LINESTRING Z (-1 1 1, 3 1 1)")
+
+    result = phsurface.Intersection(line)
+
+    assert result.ExportToWkt() == "MULTIPOINT (0 1 1,2 1 1)"

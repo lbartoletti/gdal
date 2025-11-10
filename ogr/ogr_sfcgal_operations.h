@@ -87,110 +87,89 @@ class OGRSFCGALGeometryPtr
 
 /************************************************************************/
 /*                      OGRSFCGALOperations                             */
-/*  Static class providing all SFCGAL operations with proper error     */
-/*  handling, thread safety, and resource management                   */
 /************************************************************************/
 
 class CPL_DLL OGRSFCGALOperations
 {
   private:
-    // Thread-safe initialization
     static void EnsureInitialized();
 
   public:
-    // Conversion helpers
     static OGRSFCGALGeometryPtr ToSFCGAL(const OGRGeometry *poGeom);
     static OGRGeometry *FromSFCGAL(const sfcgal_geometry_t *geom);
 
-    // ===== Existing operations (refactored from OGRGeometry) =====
-
-    /** Validate geometry using SFCGAL */
     static bool IsValid(const OGRGeometry *poGeom);
 
-    /** 2D distance using SFCGAL */
     static double Distance(const OGRGeometry *poGeom1,
                            const OGRGeometry *poGeom2);
 
-    /** 3D distance using SFCGAL */
     static double Distance3D(const OGRGeometry *poGeom1,
                              const OGRGeometry *poGeom2);
 
-    /** 3D area calculation */
     static double Area3D(const OGRGeometry *poGeom);
 
-    /** 3D convex hull */
     static OGRGeometry *ConvexHull3D(const OGRGeometry *poGeom);
 
-    /** 3D intersection */
     static OGRGeometry *Intersection3D(const OGRGeometry *poGeom1,
                                        const OGRGeometry *poGeom2);
 
-    /** 3D union */
     static OGRGeometry *Union3D(const OGRGeometry *poGeom1,
                                 const OGRGeometry *poGeom2);
 
-    /** 3D difference */
     static OGRGeometry *Difference3D(const OGRGeometry *poGeom1,
                                      const OGRGeometry *poGeom2);
 
-    /** 3D intersection test */
     static bool Intersects3D(const OGRGeometry *poGeom1,
                              const OGRGeometry *poGeom2);
 
-    // ===== NEW operations =====
-
-    /** 3D buffer operation (NOT YET IMPLEMENTED)
+    /** 3D buffer operation
      *
-     * NOTE: This function currently returns an error (CPLE_NotSupported).
-     * SFCGAL does not provide a direct 3D buffer function in its C API.
-     * A true 3D buffer would require computing the Minkowski sum with a sphere.
+     * Computes a 3D buffer around a Point or LineString geometry.
+     * The buffer radius is specified in the same units as the geometry.
+     * The result is a PolyhedralSurface.
      *
-     * This method is kept in the API for future implementation.
-     * For 2D buffer, use OGRGeometry::Buffer() instead (provided by GEOS).
+     * @param poGeom Input geometry (must be Point or LineString)
+     * @param dfDistance Buffer distance (must be positive)
+     * @return PolyhedralSurface representing the 3D buffer, or nullptr on error
      *
-     * @param poGeom Input geometry (must not be NULL)
-     * @param dfDistance Buffer distance (same units as geometry)
-     * @return Always returns nullptr with CPLE_NotSupported error
+     * @note Requires SFCGAL 2.0.0 or later
+     * @note Only works on Point and LineString geometries
+     * @note For 2D buffer, use OGRGeometry::Buffer() instead (provided by GEOS)
      *
-     * @since GDAL 3.11 (placeholder for future implementation)
+     * @since GDAL 3.13
      */
     static OGRGeometry *Buffer3D(const OGRGeometry *poGeom, double dfDistance);
 
-    /** Compute straight skeleton (2D only)
+    /** Compute straight skeleton
      *
-     * The straight skeleton is the locus of points having more than one
-     * closest point on the boundary. Used in architecture for roof design,
-     * urban planning, and computational geometry.
+     * The straight skeleton is a geometric structure derived from a polygon,
+     * representing the locus of points equidistant from polygon edges.
      *
-     * @param poGeom Input polygon (must be 2D, no Z coordinates)
+     * @param poGeom Input polygon (must be 2D)
      * @return MultiLineString representing the skeleton, or nullptr on error
      *
-     * @note Only works on 2D polygons. Will return error if Is3D() == TRUE.
-     * @note The input must be a simple polygon (no self-intersections).
+     * @note Only works on 2D Polygon geometries
+     * @note The input must be a simple polygon (no self-intersections)
      *
-     * @since GDAL 3.11
+     * @since GDAL 3.13
      */
     static OGRGeometry *StraightSkeleton(const OGRGeometry *poGeom);
 
-    /** Compute approximate medial axis (2D only)
+    /** Compute approximate medial axis
      *
-     * The medial axis (also known as topological skeleton) is the set of
-     * points having more than one closest point on the boundary, represented
-     * as a graph structure.
+     * Returns the approximate medial axis of a polygon, based on the
+     * straight skeleton with internal edges removed.
      *
-     * @param poGeom Input polygon (must be 2D, no Z coordinates)
-     * @return MultiLineString representing the approximate medial axis,
-     *         or nullptr on error
+     * @param poGeom Input polygon (must be 2D)
+     * @return MultiLineString representing the medial axis, or nullptr on error
      *
-     * @note Only works on 2D polygons. Will return error if Is3D() == TRUE.
-     * @note This is an approximation; exact medial axis computation is
-     *       computationally expensive.
+     * @note Only works on 2D Polygon geometries
+     * @note The result is the straight skeleton without the "arms" extending to vertices
      *
-     * @since GDAL 3.11
+     * @since GDAL 3.13
      */
     static OGRGeometry *ApproximateMedialAxis(const OGRGeometry *poGeom);
 
-    // Utility: Check if SFCGAL is available
     static bool IsAvailable();
 };
 

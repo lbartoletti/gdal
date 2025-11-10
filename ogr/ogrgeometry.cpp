@@ -3716,20 +3716,20 @@ double OGR_G_Distance3D(OGRGeometryH hFirst, OGRGeometryH hOther)
 /************************************************************************/
 
 /**
- * \brief Compute a 3D buffer around a geometry (NOT YET IMPLEMENTED).
+ * \brief Compute a 3D buffer around a geometry.
  *
  * This function is a C wrapper for OGRGeometry::Buffer3D().
  *
- * NOTE: This function currently returns NULL with CPLE_NotSupported error.
- * SFCGAL does not provide a direct 3D buffer function in its C API.
- * Requires SFCGAL support at runtime.
+ * Computes a 3D buffer around a Point or LineString geometry.
+ * The result is a PolyhedralSurface.
+ * Requires SFCGAL 2.0.0 or later at runtime.
  *
- * @param hGeom the geometry.
- * @param dfDistance the buffer distance to be applied.
+ * @param hGeom the geometry (must be Point or LineString).
+ * @param dfDistance the buffer distance (must be positive).
  *
- * @return the newly created geometry (NULL on error or not implemented).
+ * @return the newly created PolyhedralSurface geometry (NULL on error).
  *
- * @since GDAL 3.11
+ * @since GDAL 3.13
  */
 
 OGRGeometryH OGR_G_Buffer3D(OGRGeometryH hGeom, double dfDistance)
@@ -3749,7 +3749,8 @@ OGRGeometryH OGR_G_Buffer3D(OGRGeometryH hGeom, double dfDistance)
  *
  * This function is a C wrapper for OGRGeometry::StraightSkeleton().
  *
- * The straight skeleton is a 2D algorithm used in computational geometry.
+ * The straight skeleton is a geometric structure derived from a polygon,
+ * representing the locus of points equidistant from polygon edges.
  * Only 2D polygons are supported (no Z coordinates).
  * Requires SFCGAL support at runtime.
  *
@@ -3757,7 +3758,7 @@ OGRGeometryH OGR_G_Buffer3D(OGRGeometryH hGeom, double dfDistance)
  *
  * @return the newly created MultiLineString geometry (NULL on error).
  *
- * @since GDAL 3.11
+ * @since GDAL 3.13
  */
 
 OGRGeometryH OGR_G_StraightSkeleton(OGRGeometryH hGeom)
@@ -3777,7 +3778,8 @@ OGRGeometryH OGR_G_StraightSkeleton(OGRGeometryH hGeom)
  *
  * This function is a C wrapper for OGRGeometry::ApproximateMedialAxis().
  *
- * The medial axis (also known as topological skeleton) is a 2D algorithm.
+ * Returns the approximate medial axis of a polygon, based on the
+ * straight skeleton with internal edges removed.
  * Only 2D polygons are supported (no Z coordinates).
  * Requires SFCGAL support at runtime.
  *
@@ -3785,7 +3787,7 @@ OGRGeometryH OGR_G_StraightSkeleton(OGRGeometryH hGeom)
  *
  * @return the newly created MultiLineString geometry (NULL on error).
  *
- * @since GDAL 3.11
+ * @since GDAL 3.13
  */
 
 OGRGeometryH OGR_G_ApproximateMedialAxis(OGRGeometryH hGeom)
@@ -8990,20 +8992,21 @@ IOGRConstGeometryVisitor::~IOGRConstGeometryVisitor() = default;
 /**
  * \brief Compute 3D buffer around geometry
  *
- * Creates a 3D buffer (offset) around the geometry at the specified distance.
- * Works on both 2D and 3D geometries. The result is typically a
- * PolyhedralSurface for 3D inputs, or an extruded polygon for 2D inputs.
+ * Computes a 3D buffer around a Point or LineString geometry.
+ * The buffer radius is specified in the same units as the geometry.
+ * The result is a PolyhedralSurface.
  *
- * This method requires the SFCGAL library. If OGR is built without SFCGAL,
+ * This method requires SFCGAL 2.0.0 or later. If OGR is built without SFCGAL,
  * this method will return nullptr with an error.
  *
- * @param dfDistance Buffer distance (same units as geometry coordinates)
- * @return Buffered geometry, or nullptr on error
+ * @param dfDistance Buffer distance (must be positive)
+ * @return PolyhedralSurface representing the 3D buffer, or nullptr on error
  *
- * @note For 2D buffer, use Buffer() instead (provided by GEOS, faster)
- * @note Thread-safe since GDAL 3.11
+ * @note Requires SFCGAL 2.0.0 or later
+ * @note Only works on Point and LineString geometries
+ * @note For 2D buffer, use Buffer() instead (provided by GEOS)
  *
- * @since GDAL 3.11
+ * @since GDAL 3.13
  * @see Buffer() for 2D buffer operation
  */
 OGRGeometry *OGRGeometry::Buffer3D(
@@ -9023,23 +9026,19 @@ OGRGeometry *OGRGeometry::Buffer3D(
 /************************************************************************/
 
 /**
- * \brief Compute straight skeleton (2D only)
+ * \brief Compute straight skeleton
  *
  * Computes the straight skeleton of a 2D polygon. The straight skeleton
- * is the locus of points having more than one closest point on the
- * polygon boundary. It's widely used in:
- * - Architecture: automatic roof construction
- * - Urban planning: block and parcel analysis
- * - Computational geometry: polygon partitioning
+ * is a geometric structure derived from a polygon, representing the locus
+ * of points equidistant from polygon edges.
  *
  * This method requires the SFCGAL library. If OGR is built without SFCGAL,
  * this method will return nullptr with an error.
  *
  * @return MultiLineString representing the skeleton, or nullptr on error
  *
- * @note Only works on 2D polygons (Is3D() must be FALSE)
- * @note Input must be a simple Polygon (no self-intersections)
- * @note Thread-safe since GDAL 3.11
+ * @note Only works on 2D Polygon geometries
+ * @note Input must be a simple polygon (no self-intersections)
  *
  * Example:
  * \code{.cpp}
@@ -9049,7 +9048,7 @@ OGRGeometry *OGRGeometry::Buffer3D(
  *   // Use skeleton for roof ridge line generation
  * \endcode
  *
- * @since GDAL 3.11
+ * @since GDAL 3.13
  * @see ApproximateMedialAxis() for an alternative skeleton representation
  */
 OGRGeometry *OGRGeometry::StraightSkeleton() const
@@ -9067,26 +9066,18 @@ OGRGeometry *OGRGeometry::StraightSkeleton() const
 /************************************************************************/
 
 /**
- * \brief Compute approximate medial axis (2D only)
+ * \brief Compute approximate medial axis
  *
- * Computes the approximate medial axis (topological skeleton) of a 2D
- * polygon. The medial axis is the set of points having more than one
- * closest point on the boundary, represented as a graph structure.
- *
- * Unlike StraightSkeleton(), the medial axis uses circular arcs rather
- * than straight line segments, providing a different decomposition useful
- * for shape analysis and morphological operations.
+ * Returns the approximate medial axis of a polygon, based on the
+ * straight skeleton with internal edges removed.
  *
  * This method requires the SFCGAL library. If OGR is built without SFCGAL,
  * this method will return nullptr with an error.
  *
- * @return MultiLineString representing the approximate medial axis,
- *         or nullptr on error
+ * @return MultiLineString representing the medial axis, or nullptr on error
  *
- * @note Only works on 2D polygons (Is3D() must be FALSE)
- * @note This is an approximation; exact medial axis computation is very
- *       expensive computationally
- * @note Thread-safe since GDAL 3.11
+ * @note Only works on 2D Polygon geometries
+ * @note The result is the straight skeleton without the "arms" extending to vertices
  *
  * Example:
  * \code{.cpp}
@@ -9096,7 +9087,7 @@ OGRGeometry *OGRGeometry::StraightSkeleton() const
  *   // Use for shape analysis
  * \endcode
  *
- * @since GDAL 3.11
+ * @since GDAL 3.13
  * @see StraightSkeleton() for straight skeleton computation
  */
 OGRGeometry *OGRGeometry::ApproximateMedialAxis() const

@@ -451,31 +451,75 @@ bool OGRSFCGALOperations::Intersects3D(const OGRGeometry *poGeom1,
 }
 
 /************************************************************************/
-/*                    ===== NEW OPERATIONS =====                        */
-/************************************************************************/
-
-/************************************************************************/
 /*                            Buffer3D()                                */
 /************************************************************************/
 
 OGRGeometry *OGRSFCGALOperations::Buffer3D(const OGRGeometry *poGeom,
                                            double dfDistance)
 {
+#if SFCGAL_VERSION_NUM < SFCGAL_VERSION(2, 0, 0)
     CPL_IGNORE_RET_VAL(poGeom);
     CPL_IGNORE_RET_VAL(dfDistance);
 
-    // Note: SFCGAL does not provide a direct 3D buffer function in its C API
-    // The sfcgal_geometry_buffer function does not exist or is not available
-    // in the standard SFCGAL distribution.
-    // A true 3D buffer would require computing the Minkowski sum with a sphere,
-    // which is computationally expensive.
-    // For now, we return an error indicating this is not yet implemented.
-
     CPLError(CE_Failure, CPLE_NotSupported,
-             "Buffer3D is not yet implemented. "
-             "SFCGAL does not provide a direct 3D buffer function in its C API. "
-             "For 2D buffer, use Buffer() instead (GEOS).");
+             "Buffer3D requires SFCGAL 2.0.0 or later. "
+             "Current SFCGAL version is %s.",
+             sfcgal_version());
     return nullptr;
+#else
+    if (!poGeom)
+    {
+        CPLError(CE_Failure, CPLE_AppDefined,
+                 "NULL geometry passed to Buffer3D");
+        return nullptr;
+    }
+
+    if (dfDistance <= 0)
+    {
+        CPLError(CE_Failure, CPLE_AppDefined,
+                 "Buffer3D requires a positive distance (got %f)", dfDistance);
+        return nullptr;
+    }
+
+    const OGRwkbGeometryType eType = wkbFlatten(poGeom->getGeometryType());
+    if (eType != wkbPoint && eType != wkbLineString)
+    {
+        CPLError(CE_Failure, CPLE_AppDefined,
+                 "Buffer3D only works on Point and LineString geometries (got %s)",
+                 poGeom->getGeometryName());
+        return nullptr;
+    }
+
+    auto poThis = ToSFCGAL(poGeom);
+    if (!poThis)
+    {
+        CPLError(CE_Failure, CPLE_AppDefined,
+                 "Failed to convert geometry to SFCGAL format");
+        return nullptr;
+    }
+
+    // Use default parameters: 8 segments, ROUND buffer type (0)
+    constexpr int nSegments = 8;
+    constexpr int nBufferType = 0;  // ROUND
+
+    OGRSFCGALGeometryPtr poRes(
+        sfcgal_geometry_buffer3d(poThis.get(), dfDistance, nSegments, nBufferType));
+
+    if (!poRes)
+    {
+        CPLError(CE_Failure, CPLE_AppDefined,
+                 "SFCGAL Buffer3D operation failed");
+        return nullptr;
+    }
+
+    OGRGeometry *poResult = FromSFCGAL(poRes.get());
+    if (poResult && poGeom->getSpatialReference())
+    {
+        poResult->assignSpatialReference(poGeom->getSpatialReference());
+    }
+
+    return poResult;
+#endif
 }
 
 /************************************************************************/
